@@ -6,6 +6,9 @@ A _hub_ is composed of **subscribers** which subscribe to various **topics**.
 The hub can then **publish** (broadcast) a message for a given topic and all
 subscribers of that topic will be sent the message.
 
+Annotated source code: http://bruth.github.com/pubsub/docs/pubsub.html
+Tests: http://bruth.github.com/pubsub/test/index.html
+
 ```javascript
 var hub = new PubSub;
 var output;
