@@ -6,6 +6,8 @@ UGLIFY = `which node` build/uglify.js --unsafe
 COMPILER = `which coffee` -b -s -p
 DOCCO = `which docco`
 
+QUNIT_SM = ${SRC_DIR}/qunit
+
 MODULES = ${SRC_DIR}/pubsub.coffee
 
 VERSION = $(shell cat VERSION)
