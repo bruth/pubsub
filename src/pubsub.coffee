@@ -24,10 +24,7 @@ do (window) ->
         @backwards = backwards
         @context = context or @
         @active = true
-        @last = null
         @
-
-
 
     # Pub
     # ---
@@ -38,7 +35,6 @@ do (window) ->
         @args = args
         @prev = prev
         @
-
 
     # Topic
     # -----
@@ -51,40 +47,20 @@ do (window) ->
         @active = true
         @
 
-
-    # Primary constructor for PubSub hubs
     PubSub = -> new PubSub.fn.init()
 
     PubSub.version = '@VERSION'
 
-    # Build up the PubSub prototype
     PubSub.fn = PubSub:: =
 
         constructor: PubSub
 
         init: ->
-            # Registered topics for this hub
             @topics = {}
-
-            # All publications for this hub
             @publications = {}
-
-            # All subscribers for this hub
             @subscribers = {}
-
-            # An undo stack containing ``Pub`` instances. A publication is
-            # added to the stack for each successful transaction
             @undoStack = []
-
-            # A redo stack containing ``Pub`` instances. A publication is added
-            # to the stack when ``undo`` is called. if transactions occur after
-            # items are undone, this stack flushes to ensure consistent behavior
-            # for future undos
             @redoStack = []
-
-            # A reference to the last ``Pub`` for this hub
-            @last = null
-
             @
 
         # Subscribes a handler for the given topic. For [idempotent][1]
@@ -100,29 +76,33 @@ do (window) ->
         # apply the full publication history for this topic. ``tip`` can be
         # supplied to only execute the last publication on the queue.
         #
+        # A sub IDcan passed in to _resume_ a previous subscription.
+        # If this method is used, a second parameter can be supplied to
+        # specify whether the subscriber should apply this topic's publish
+        # history. If a topic ``name`` is passed in without a ``forwards``
+        # handler, the topic will be re-activated.
+        #
         # [1]: http://en.wikipedia.org/wiki/Idempotence
         subscribe: (name, forwards, backwards, context, history='full') ->
 
-            # A ``suid`` can passed in to _resume_ a previous subscription.
-            # If this method is used, a second parameter can be supplied to
-            # specify whether the subscriber should apply this topic's publish
-            # history.
             if typeof name is 'number'
                 if not (sub = @subscribers[name]) then return
                 sub.active = true
                 topic = sub.topic
                 publish = forwards or publish
             else
-                # Get or create a ``Topic`` instance if one does already exist
                 if not (topic = @topics[name])
                     topic = @topics[name] = new Topic name
+
+                else if not forwards or typeof forwards isnt 'function'
+                    topic.active = true
+                    return
 
                 sub = new Sub topic, forwards, backwards, context
 
                 @subscribers[sub.id] = sub
                 topic.subscribers.push sub
 
-            # handle the various late binding options...
             if history and topic.history.length
                 switch history 
                     when 'full'
@@ -159,7 +139,6 @@ do (window) ->
         # deleted from this hub.
         unsubscribe: (name, hard=false) ->
 
-            # Handles unsubscribing a single subscriber.
             if typeof name is 'number'
                 sub = @subscribers[name]
                 if hard
@@ -190,10 +169,9 @@ do (window) ->
         # Currently, only top-level publications are recorded. If the hub's
         # ``locked`` flag is ``true``, no publication is recorded.
         publish: (name, args...) ->
-            # Get or create a ``Topic`` instance if one does already exist
+
             if not (topic = @topics[name])
                 topic = @topics[name] = new Topic name
-            # Ensure the topic is capable of broadcasting.
             else if not topic.active
                 return
 
@@ -220,6 +198,28 @@ do (window) ->
 
             return pub and pub.id
 
+        # Undo the last publication for this hub. Recursively skip any pubs
+        # which have an unsubscribed topic.
+        undo: ->
+
+            if (pub = @undoStack.pop())
+                @redoStack.push pub
+                if not pub.topic.active
+                    @undo()
+                else
+                    @_backwards pub
+
+        # Redo the next publication for this hub. Recursively skip any pubs
+        # which have an unsubscribed topic.
+        redo: ->
+
+            if (pub = @redoStack.pop())
+                @undoStack.push pub
+                if not pub.topic.active
+                    @redo()
+                else
+                    @_forwards pub
+
         # Encapsulates a _new_ ``forwards`` execution. This hub is locked for
         # the during of this call stack (relative to the handler) to prevent
         # dependent publications from being recorded in the history.
@@ -227,6 +227,7 @@ do (window) ->
         # Errors must be caught here to ensure other subscribers are not
         # affected downstream.
         _transaction: (sub, pub, args) ->
+
             if not @locked
                 @locked = true
                 try
@@ -237,12 +238,16 @@ do (window) ->
             else
                 try sub.forwards.apply sub.context, args
 
+        # The logic behind the ``redo`` operation. Each active subscriber for
+        # the ``pub``'s topic is targeted.
+        #
+        # Errors must be caught here to ensure other subscribers are not
+        # affected downstream.
         _forwards: (pub) ->
+
             topic = pub.topic
-            # if there are any subscribers, execute their respective handlers
-            if topic.active and topic.subscribers.length
+            if topic.subscribers.length
                 for sub in topic.subscribers
-                    # Skip temporarily unsubscribed subscribers
                     if not sub.active then continue
                     try
                         sub.forwards.apply sub.context, pub.args.slice(0)
@@ -251,16 +256,21 @@ do (window) ->
 
             @last = pub
 
-
+        # The logic behind the ``undo`` operation. Each active subscriber for
+        # the ``pub``'s topic is targeted. If the ``backwards`` handler is not
+        # defined, the ``forwards`` handler will be used with the previous
+        # publication's ``args`` for the topic to mimic the last state.
+        #
+        # Errors must be caught here to ensure other subscribers are not
+        # affected downstream.
         _backwards: (pub) ->
+
             topic = pub.topic
-            # if there are any subscribers, execute their respective handlers
-            if topic.active and topic.subscribers.length
+            if topic.subscribers.length
                 for sub in topic.subscribers
-                    # Skip temporarily unsubscribed subscribers
                     if not sub.active then continue
+
                     try
-                        # Mimic the prevous publication's call
                         if not sub.backwards
                             if pub.prev
                                 sub.forwards.apply sub.context, pub.prev.args.slice(0)
@@ -273,37 +283,27 @@ do (window) ->
 
             @last = pub
 
-        undo: ->
-            if (pub = @undoStack.pop())
-                @redoStack.push pub
-                @_backwards pub
-
-        redo: ->
-            if (pub = @redoStack.pop())
-                @undoStack.push pub
-                @_forwards pub
-
         # Takes each pub in the ``redoStack`` and removes and  deferences them
-        # from the hub.
+        # from the respective ``topic`` and the hub.
         _flushRedo: ->
+
             for _ in @redoStack
                 pub = @redoStack.shift()
-                # pop this pub off of the history stack
                 pub.topic.history.pop()
                 delete @publications[pub.id]
 
+        # Create a new ``pub``, store a reference to the last pub relative
+        # to the topic. This is for idempotent (or those without a
+        # ``backwards`` handler) subscribers.
+        # 
+        # This ``pub`` is added to the topic history, the undo stack and
+        # is set as the hub's ``last`` pub.
         _recordPub: (topic, args) ->
-            # Create a new pub, store a reference to the last pub relative
-            # to the topic. This is for idempotent (or those without a
-            # ``backwards`` handler) subscribers.
+
             pub = new Pub topic, args, topic.history.last()
-            # Record this publication for this hub
             @publications[pub.id] = pub
-            # Add it to this topic's history for late subscribers
             topic.history.push pub
-            # Add it to the undo stack
             @undoStack.push pub
-            # Add it to the undo stack
             @last = pub
 
 

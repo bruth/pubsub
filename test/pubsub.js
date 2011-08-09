@@ -15,7 +15,6 @@ var __slice = Array.prototype.slice;
     this.backwards = backwards;
     this.context = context || this;
     this.active = true;
-    this.last = null;
     return this;
   };
   Pub = function(topic, args, prev) {
@@ -44,7 +43,6 @@ var __slice = Array.prototype.slice;
       this.subscribers = {};
       this.undoStack = [];
       this.redoStack = [];
-      this.last = null;
       return this;
     },
     subscribe: function(name, forwards, backwards, context, history) {
@@ -62,6 +60,9 @@ var __slice = Array.prototype.slice;
       } else {
         if (!(topic = this.topics[name])) {
           topic = this.topics[name] = new Topic(name);
+        } else if (!forwards || typeof forwards !== 'function') {
+          topic.active = true;
+          return;
         }
         sub = new Sub(topic, forwards, backwards, context);
         this.subscribers[sub.id] = sub;
@@ -155,6 +156,28 @@ var __slice = Array.prototype.slice;
       }
       return pub && pub.id;
     },
+    undo: function() {
+      var pub;
+      if ((pub = this.undoStack.pop())) {
+        this.redoStack.push(pub);
+        if (!pub.topic.active) {
+          return this.undo();
+        } else {
+          return this._backwards(pub);
+        }
+      }
+    },
+    redo: function() {
+      var pub;
+      if ((pub = this.redoStack.pop())) {
+        this.undoStack.push(pub);
+        if (!pub.topic.active) {
+          return this.redo();
+        } else {
+          return this._forwards(pub);
+        }
+      }
+    },
     _transaction: function(sub, pub, args) {
       if (!this.locked) {
         this.locked = true;
@@ -173,7 +196,7 @@ var __slice = Array.prototype.slice;
     _forwards: function(pub) {
       var sub, topic, _i, _len, _ref;
       topic = pub.topic;
-      if (topic.active && topic.subscribers.length) {
+      if (topic.subscribers.length) {
         _ref = topic.subscribers;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           sub = _ref[_i];
@@ -192,7 +215,7 @@ var __slice = Array.prototype.slice;
     _backwards: function(pub) {
       var sub, topic, _i, _len, _ref;
       topic = pub.topic;
-      if (topic.active && topic.subscribers.length) {
+      if (topic.subscribers.length) {
         _ref = topic.subscribers;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           sub = _ref[_i];
@@ -215,20 +238,6 @@ var __slice = Array.prototype.slice;
         }
       }
       return this.last = pub;
-    },
-    undo: function() {
-      var pub;
-      if ((pub = this.undoStack.pop())) {
-        this.redoStack.push(pub);
-        return this._backwards(pub);
-      }
-    },
-    redo: function() {
-      var pub;
-      if ((pub = this.redoStack.pop())) {
-        this.undoStack.push(pub);
-        return this._forwards(pub);
-      }
     },
     _flushRedo: function() {
       var pub, _, _i, _len, _ref, _results;
