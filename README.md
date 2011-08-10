@@ -4,10 +4,10 @@ PubSub
 * Annotated source code: http://bruth.github.com/pubsub/docs/pubsub.html
 * Tests: http://bruth.github.com/pubsub/test/index.html
 
-PubSub is a simple library for creating publish/subscribe "hubs".
-A _hub_ is composed of **subscribers** which subscribe to various **topics**.
-The hub can then **publish** (broadcast) a message for a given topic and all
-subscribers of that topic will be sent the message.
+PubSub is a simple library for creating pub/sub _hubs_. A hub is composed of
+**publishers** each of which are uniquely identified by a *topic*. Each
+publisher can have one more more **subscribers**. The hub provides a
+simple API for publishing messages on behalf of the publishers.
 
 ```javascript
 var hub = new PubSub;
@@ -25,8 +25,7 @@ Late Subscribers
 ----------------
 PubSub has support for _catching up_ late subscribers due to one reason
 (async subscription) or another. The default behavior is to iterate over
-the whole history (in it's current state) for that topic and publish to
-the subscriber.
+the whole message history and send each message to the the subscriber.
 
 ```javascript
 var hub = new PubSub;
@@ -43,7 +42,7 @@ output; // 'hello world'
 ```
 
 The ``history`` parameter supports ``'full'`` and ``'tip'``. If any other
-value is specified, none of the topic's history will be applied.
+value is specified, none of the publisher's history will be applied.
 
 
 History API
@@ -90,9 +89,9 @@ regardless of the idempotency.
 
 Unsubscribing
 -------------
-When a subscription occurs, a ``sid`` (subscription ID) is returned which can
-be used to reference the subscriber in the future. That ``sid`` can be passed
-in to temporarily unsubscribe (or fully remove) the subscriber.
+When a subscription occurs, a subscriber ID is returned which can
+be used to reference the subscriber in the future. The ``sid`` can be passed
+in to temporarily unsubscribe (or completely remove) the subscriber.
 
 ```javascript
 var hub = new PubSub;
@@ -117,8 +116,12 @@ output; // 'new message', it caught back up
 hub.unsubscribe(sid, true); 
 ```
 
-Topics can also be unsubscribed. Rather than requiring an ID, simply use
-the topic name itself.
+If a publisher topic is passed into ``unsubscribe`` all messages for that
+publisher are suspended. That is, any call to ``publish`` for the suspended
+publisher will never be forwarded to it's subscribers.
+
+As with the subscriber above, publishers can be completely removed from the
+hub.
 
 ```javascript
 var hub = new PubSub;
@@ -133,14 +136,14 @@ output; // 'hello world'
 
 hub.unsubscribe('foo');
 
-// no history is recorded while a topic is unsubscribed
+// no history is recorded while a publisher is unsubscribed
 hub.publish('foo', 'new message');
 output; // 'hello world!', nothing changed
 
-hub.subscribe('topic');
+hub.subscribe('foo');
 output; // 'hello world!', still nothing changed
 
-// completely removes it from the hub. the topic and all of it's subscribers
-// are removed from the hub.
+// completely removes it from the hub. the publisher and all of it's
+// subscribers are removed from the hub.
 hub.unsubscribe('foo', true); 
 ```
