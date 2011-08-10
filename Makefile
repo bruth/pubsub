@@ -13,7 +13,7 @@ MODULES = ${SRC_DIR}/pubsub.coffee
 VERSION = $(shell cat VERSION)
 DATE = $(shell git log -1 --pretty=format:%ad)
 
-all: pull qunit build docs uglify
+all: build docs uglify
 
 qunit:
 	@@echo 'Updating QUnit...'
