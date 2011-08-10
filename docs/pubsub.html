@@ -1,49 +1,54 @@
 <!DOCTYPE html>  <html> <head>   <title>pubsub.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <link rel="stylesheet" media="all" href="docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>          <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               pubsub.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>               <pre><code>PubSub - The PubSub library with a history API
 (c) 2011 Byron Ruth
 PubSub may be freely distributed under the MIT license
-Version: 0.1
-</code></pre>             </td>             <td class="code">               <div class="highlight"><pre><span class="nx">do</span> <span class="nf">(window) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Add helper function to Array</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">if</span> <span class="o">not</span> <span class="nb">Array</span><span class="o">::</span><span class="nx">last</span> <span class="k">then</span> <span class="nb">Array</span><span class="o">::</span><span class="nv">last = </span><span class="o">-&gt;</span> <span class="err">@</span><span class="p">[</span><span class="k">this</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-3">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-3">&#182;</a>               </div>               <p>Internal unique identifiers for publications and subscribers</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">puid = </span><span class="mi">1</span>
-    <span class="nv">suid = </span><span class="mi">1</span></pre></div>             </td>           </tr>                               <tr id="section-4">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-4">&#182;</a>               </div>               <h2>Sub</h2>
+Version: 0.2
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre><span class="nx">do</span> <span class="nf">(window) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Add helper function to Array</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">if</span> <span class="o">not</span> <span class="nb">Array</span><span class="o">::</span><span class="nx">last</span> <span class="k">then</span> <span class="nb">Array</span><span class="o">::</span><span class="nv">last = </span><span class="o">-&gt;</span> <span class="err">@</span><span class="p">[</span><span class="k">this</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-3">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-3">&#182;</a>               </div>               <p>Internal unique identifiers for messages and subscribers</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">muid = </span><span class="mi">1</span>
+    <span class="nv">suid = </span><span class="mi">1</span></pre></div>             </td>           </tr>                               <tr id="section-4">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-4">&#182;</a>               </div>               <h2>Subscriber</h2>
 
-<p>Simple constructor to encapsulate a subscriber</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">Sub = </span><span class="nf">(topic, forwards, backwards, context) -&gt;</span>
+<p>Simple constructor to encapsulate a subscriber</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">Subscriber = </span><span class="nf">(publisher, forwards, backwards, context) -&gt;</span>
         <span class="vi">@id = </span><span class="nx">suid</span><span class="o">++</span>
-        <span class="vi">@topic = </span><span class="nx">topic</span>
+        <span class="vi">@publisher = </span><span class="nx">publisher</span>
         <span class="vi">@forwards = </span><span class="nx">forwards</span>
         <span class="vi">@backwards = </span><span class="nx">backwards</span>
         <span class="vi">@context = </span><span class="nx">context</span> <span class="o">or</span> <span class="err">@</span>
         <span class="vi">@active = </span><span class="kc">true</span>
-        <span class="err">@</span></pre></div>             </td>           </tr>                               <tr id="section-5">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-5">&#182;</a>               </div>               <h2>Pub</h2>
+        <span class="vi">@tip = </span><span class="kc">null</span>
+        <span class="err">@</span></pre></div>             </td>           </tr>                               <tr id="section-5">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-5">&#182;</a>               </div>               <h2>Message</h2>
 
-<p>Simple constructor to encapsulate a top-level publishing</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">Pub = </span><span class="nf">(topic, args, prev) -&gt;</span>
-        <span class="vi">@id = </span><span class="nx">puid</span><span class="o">++</span>
-        <span class="vi">@topic = </span><span class="nx">topic</span>
+<p>Simple constructor to encapsulate a top-level publishing</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">Message = </span><span class="nf">(publisher, args, previous) -&gt;</span>
+        <span class="vi">@id = </span><span class="nx">muid</span><span class="o">++</span>
+        <span class="vi">@publisher = </span><span class="nx">publisher</span>
         <span class="vi">@args = </span><span class="nx">args</span>
-        <span class="vi">@prev = </span><span class="nx">prev</span>
-        <span class="err">@</span></pre></div>             </td>           </tr>                               <tr id="section-6">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-6">&#182;</a>               </div>               <h2>Topic</h2>
+        <span class="vi">@previous = </span><span class="nx">previous</span>
+        <span class="err">@</span></pre></div>             </td>           </tr>                               <tr id="section-6">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-6">&#182;</a>               </div>               <h2>Publisher</h2>
 
-<p>Simple constructor to encapsulate a single topic. all <code>subscribers</code>
-and publish <code>history</code> references for this topic are stored here.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">Topic = </span><span class="nf">(name) -&gt;</span>
+<p>Simple constructor to encapsulate a single publisher. all <code>subscribers</code>
+and messages <code>messages</code> references for this publisher are stored here.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">Publisher = </span><span class="nf">(name) -&gt;</span>
         <span class="vi">@name = </span><span class="nx">name</span>
         <span class="vi">@subscribers = </span><span class="p">[]</span>
-        <span class="vi">@history = </span><span class="p">[]</span>
+        <span class="vi">@messages = </span><span class="p">[]</span>
         <span class="vi">@active = </span><span class="kc">true</span>
         <span class="err">@</span>
 
-    <span class="nv">PubSub = </span><span class="o">-&gt;</span> <span class="k">new</span> <span class="nx">PubSub</span><span class="p">.</span><span class="nx">fn</span><span class="p">.</span><span class="nx">init</span><span class="p">()</span>
+    <span class="nv">PubSub = </span><span class="nf">(undoStackSize) -&gt;</span>
+        <span class="k">new</span> <span class="nx">PubSub</span><span class="p">.</span><span class="nx">fn</span><span class="p">.</span><span class="nx">init</span><span class="p">(</span><span class="nx">undoStackSize</span><span class="p">)</span>
 
-    <span class="nv">PubSub.version = </span><span class="s1">&#39;0.1&#39;</span>
+    <span class="nv">PubSub.version = </span><span class="s1">&#39;0.2&#39;</span>
 
     <span class="nv">PubSub.fn = PubSub:: =</span>
 
-        <span class="nv">constructor: </span><span class="nx">PubSub</span>
+        <span class="nv">constructor: </span><span class="nx">PubSub</span></pre></div>             </td>           </tr>                               <tr id="section-7">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-7">&#182;</a>               </div>               <p>The <code>PubSub</code> constructor takes a single optional argument
+<code>undoStackSize</code> which specifies a limit to the undo stack size. If
+it reaches the limit, the oldest undo will be shifted off</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">init: </span><span class="nf">(undoStackSize) -&gt;</span>
+            <span class="vi">@undoStackSize = </span><span class="nx">undoStackSize</span>
 
-        <span class="nv">init: </span><span class="o">-&gt;</span>
-            <span class="vi">@topics = </span><span class="p">{}</span>
-            <span class="vi">@publications = </span><span class="p">{}</span>
+            <span class="vi">@publishers = </span><span class="p">{}</span>
             <span class="vi">@subscribers = </span><span class="p">{}</span>
-            <span class="vi">@undoStack = </span><span class="p">[]</span>
-            <span class="vi">@redoStack = </span><span class="p">[]</span>
-            <span class="err">@</span></pre></div>             </td>           </tr>                               <tr id="section-7">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-7">&#182;</a>               </div>               <p>Subscribes a handler for the given topic. For <a href="http://en.wikipedia.org/wiki/Idempotence">idempotent</a>
+            <span class="vi">@messages = </span><span class="p">{}</span>
+            <span class="vi">@tip = </span><span class="kc">null</span>
+            <span class="vi">@_undos = </span><span class="p">[]</span>
+            <span class="vi">@_redos = </span><span class="p">[]</span>
+            <span class="err">@</span></pre></div>             </td>           </tr>                               <tr id="section-8">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-8">&#182;</a>               </div>               <p>Subscribes a handler for the given publisher. For <a href="http://en.wikipedia.org/wiki/Idempotence">idempotent</a>
 subscribers, only the <code>forwards</code> handler is required. For
 non-idempotent subscribers a <code>backwards</code> handler must also be
 defined to ensure consistency during undo/redo operations.</p>
@@ -53,180 +58,184 @@ defined to ensure consistency during undo/redo operations.</p>
 
 <p>The <code>history</code> parameter can be supplied to ensure this subscriber
 "catches up" in state. <code>full</code> (default) can be supplied to
-apply the full publication history for this topic. <code>tip</code> can be
-supplied to only execute the last publication on the queue.</p>
+apply the full message messages for this publisher. <code>tip</code> can be
+supplied to only execute the last message on the queue.</p>
 
-<p>A sub IDcan passed in to <em>resume</em> a previous subscription.
+<p>A subscriber ID can be passed in to <em>resume</em> a previous subscription.
 If this method is used, a second parameter can be supplied to
-specify whether the subscriber should apply this topic's publish
-history. If a topic <code>name</code> is passed in without a <code>forwards</code>
-handler, the topic will be re-activated.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">subscribe: </span><span class="nf">(name, forwards, backwards, context, history=&#39;full&#39;) -&gt;</span>
+specify whether the subscriber should apply this publisher's publish
+messages. If a publisher <code>name</code> is passed in without a <code>forwards</code>
+handler, the publisher will be re-activated.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">subscribe: </span><span class="nf">(name, forwards, backwards, context, history=&#39;full&#39;) -&gt;</span>
 
             <span class="k">if</span> <span class="k">typeof</span> <span class="nx">name</span> <span class="o">is</span> <span class="s1">&#39;number&#39;</span>
-                <span class="k">if</span> <span class="o">not</span> <span class="p">(</span><span class="nv">sub = </span><span class="nx">@subscribers</span><span class="p">[</span><span class="nx">name</span><span class="p">])</span> <span class="k">then</span> <span class="k">return</span>
-                <span class="nv">sub.active = </span><span class="kc">true</span>
-                <span class="nv">topic = </span><span class="nx">sub</span><span class="p">.</span><span class="nx">topic</span>
+                <span class="k">if</span> <span class="o">not</span> <span class="p">(</span><span class="nv">subscriber = </span><span class="nx">@subscribers</span><span class="p">[</span><span class="nx">name</span><span class="p">])</span> <span class="k">then</span> <span class="k">return</span>
+                <span class="nv">subscriber.active = </span><span class="kc">true</span>
+                <span class="nv">publisher = </span><span class="nx">subscriber</span><span class="p">.</span><span class="nx">publisher</span>
                 <span class="nv">publish = </span><span class="nx">forwards</span> <span class="o">or</span> <span class="nx">publish</span>
             <span class="k">else</span>
-                <span class="k">if</span> <span class="o">not</span> <span class="p">(</span><span class="nv">topic = </span><span class="nx">@topics</span><span class="p">[</span><span class="nx">name</span><span class="p">])</span>
-                    <span class="nv">topic = </span><span class="nx">@topics</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Topic</span> <span class="nx">name</span>
+                <span class="k">if</span> <span class="o">not</span> <span class="p">(</span><span class="nv">publisher = </span><span class="nx">@publishers</span><span class="p">[</span><span class="nx">name</span><span class="p">])</span>
+                    <span class="nv">publisher = </span><span class="nx">@publishers</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Publisher</span> <span class="nx">name</span>
 
                 <span class="k">else</span> <span class="k">if</span> <span class="o">not</span> <span class="nx">forwards</span> <span class="o">or</span> <span class="k">typeof</span> <span class="nx">forwards</span> <span class="o">isnt</span> <span class="s1">&#39;function&#39;</span>
-                    <span class="nv">topic.active = </span><span class="kc">true</span>
+                    <span class="nv">publisher.active = </span><span class="kc">true</span>
                     <span class="k">return</span>
 
-                <span class="nv">sub = </span><span class="k">new</span> <span class="nx">Sub</span> <span class="nx">topic</span><span class="p">,</span> <span class="nx">forwards</span><span class="p">,</span> <span class="nx">backwards</span><span class="p">,</span> <span class="nx">context</span>
+                <span class="nv">subscriber = </span><span class="k">new</span> <span class="nx">Subscriber</span> <span class="nx">publisher</span><span class="p">,</span> <span class="nx">forwards</span><span class="p">,</span> <span class="nx">backwards</span><span class="p">,</span> <span class="nx">context</span>
 
-                <span class="nx">@subscribers</span><span class="p">[</span><span class="nx">sub</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span> <span class="o">=</span> <span class="nx">sub</span>
-                <span class="nx">topic</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">push</span> <span class="nx">sub</span>
-
-            <span class="k">if</span> <span class="nx">history</span> <span class="o">and</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">length</span>
-                <span class="k">switch</span> <span class="nx">history</span> 
+                <span class="nx">@subscribers</span><span class="p">[</span><span class="nx">subscriber</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span> <span class="o">=</span> <span class="nx">subscriber</span>
+                <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">push</span> <span class="nx">subscriber</span></pre></div>             </td>           </tr>                               <tr id="section-9">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-9">&#182;</a>               </div>               <p>Ensure this new subscriber does not go past the hub's current
+state and does not duplicate a response to a former message.</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">if</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span><span class="p">.</span><span class="nx">length</span>
+                <span class="k">switch</span> <span class="nx">history</span>
                     <span class="k">when</span> <span class="s1">&#39;full&#39;</span>
-                        <span class="k">for</span> <span class="nx">pub</span> <span class="k">in</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">history</span></pre></div>             </td>           </tr>                               <tr id="section-8">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-8">&#182;</a>               </div>               <p>Ensure this subscriber does not go past the
-app's current state</p>             </td>             <td class="code">               <div class="highlight"><pre>                            <span class="k">if</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">id</span> <span class="o">&gt;</span> <span class="nx">@last</span><span class="p">.</span><span class="nx">id</span>
-                                <span class="k">break</span></pre></div>             </td>           </tr>                               <tr id="section-9">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-9">&#182;</a>               </div>               <p>The subscriber's last publication may be later than
-the current <code>pub</code>. If so, skip it.</p>             </td>             <td class="code">               <div class="highlight"><pre>                            <span class="k">if</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">last</span> <span class="o">and</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">last</span><span class="p">.</span><span class="nx">id</span> <span class="o">&gt;=</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">id</span>
-                                <span class="k">continue</span></pre></div>             </td>           </tr>                               <tr id="section-10">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-10">&#182;</a>               </div>               <p>Apply the <code>forwards</code> handler </p>             </td>             <td class="code">               <div class="highlight"><pre>                            <span class="nx">sub</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">args</span>
-
+                        <span class="nv">messages = </span><span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span>
                     <span class="k">when</span> <span class="s1">&#39;tip&#39;</span>
-                        <span class="nv">pub = </span><span class="nx">topic</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">last</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-11">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-11">&#182;</a>               </div>               <p>Ensure this new subscriber does not go past the
-app's current state and does not duplicate a response
-to a former publication.</p>             </td>             <td class="code">               <div class="highlight"><pre>                        <span class="k">if</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">id</span> <span class="o">&gt;</span> <span class="nx">@last</span><span class="p">.</span><span class="nx">id</span> <span class="k">then</span> <span class="k">return</span>
-                        <span class="k">if</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">last</span> <span class="o">and</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">last</span><span class="p">.</span><span class="nx">id</span> <span class="o">&gt;=</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">id</span> <span class="k">then</span> <span class="k">return</span>
-                        <span class="nx">sub</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">args</span>
+                        <span class="nv">messages = </span><span class="p">[</span><span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span><span class="p">.</span><span class="nx">last</span><span class="p">()]</span>
+                    <span class="k">else</span>
+                        <span class="nv">messages = </span><span class="p">[]</span>
 
-                <span class="nv">sub.last = </span><span class="nx">pub</span></pre></div>             </td>           </tr>                               <tr id="section-12">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-12">&#182;</a>               </div>               <p>return the subscriber id for later reference in the application</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">return</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">id</span></pre></div>             </td>           </tr>                               <tr id="section-13">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-13">&#182;</a>               </div>               <p>Unsubscribe all subscribers for a given <code>topic</code> is a topic name is
+                <span class="k">for</span> <span class="nx">message</span> <span class="k">in</span> <span class="nx">messages</span>
+                    <span class="k">if</span> <span class="nx">message</span><span class="p">.</span><span class="nx">id</span> <span class="o">&gt;</span> <span class="nx">@tip</span><span class="p">.</span><span class="nx">id</span>
+                        <span class="k">break</span>
+                    <span class="k">if</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">tip</span> <span class="o">and</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">tip</span><span class="p">.</span><span class="nx">id</span> <span class="o">&gt;=</span> <span class="nx">message</span><span class="p">.</span><span class="nx">id</span>
+                        <span class="k">continue</span>
+
+                    <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">args</span>
+
+                <span class="nv">subscriber.tip = </span><span class="nx">message</span></pre></div>             </td>           </tr>                               <tr id="section-10">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-10">&#182;</a>               </div>               <p>return the subscriber id for later reference in the application</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">return</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">id</span></pre></div>             </td>           </tr>                               <tr id="section-11">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-11">&#182;</a>               </div>               <p>Unsubscribe all subscribers for a given <code>publisher</code> is a publisher name is
 supplied or unsubscribe a subscriber via their <code>id</code>. If <code>remove</code>
 is <code>true</code>, all references to the unsubscribed object will be
 deleted from this hub.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">unsubscribe: </span><span class="nf">(name, hard=false) -&gt;</span>
 
             <span class="k">if</span> <span class="k">typeof</span> <span class="nx">name</span> <span class="o">is</span> <span class="s1">&#39;number&#39;</span>
-                <span class="nv">sub = </span><span class="nx">@subscribers</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span>
+                <span class="nv">subscriber = </span><span class="nx">@subscribers</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span>
                 <span class="k">if</span> <span class="nx">hard</span>
                     <span class="k">delete</span> <span class="nx">@subscribers</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span>
-                    <span class="nv">subscribers = </span><span class="nx">sub</span><span class="p">.</span><span class="nx">topic</span><span class="p">.</span><span class="nx">subscribers</span>
+                    <span class="nv">subscribers = </span><span class="nx">subscriber</span><span class="p">.</span><span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span>
                     <span class="nv">len = </span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">length</span>
                     <span class="k">while</span> <span class="nx">len</span><span class="o">--</span>
-                        <span class="k">if</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">id</span> <span class="o">is</span> <span class="nx">subscribers</span><span class="p">[</span><span class="nx">len</span><span class="p">].</span><span class="nx">id</span>
+                        <span class="k">if</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">id</span> <span class="o">is</span> <span class="nx">subscribers</span><span class="p">[</span><span class="nx">len</span><span class="p">].</span><span class="nx">id</span>
                             <span class="nx">subscribers</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">len</span><span class="p">,</span> <span class="mi">1</span>
                 <span class="k">else</span>
-                    <span class="nv">sub.active = </span><span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-14">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-14">&#182;</a>               </div>               <p>Handles unsubscribing a whole topic, i.e. it will no longer
-broadcast or record new publications.</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">else</span>
-                <span class="k">if</span> <span class="p">(</span><span class="nv">topic = </span><span class="nx">@topics</span><span class="p">[</span><span class="nx">name</span><span class="p">])</span>
+                    <span class="nv">subscriber.active = </span><span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-12">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-12">&#182;</a>               </div>               <p>Handles unsubscribing a whole publisher, i.e. it will no longer
+broadcast or record new messages.</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">else</span>
+                <span class="k">if</span> <span class="p">(</span><span class="nv">publisher = </span><span class="nx">@publishers</span><span class="p">[</span><span class="nx">name</span><span class="p">])</span>
                     <span class="k">if</span> <span class="nx">hard</span> 
-                        <span class="k">for</span> <span class="nx">sub</span> <span class="k">in</span> <span class="nx">@topics</span><span class="p">[</span><span class="nx">name</span><span class="p">].</span><span class="nx">subscribers</span>
-                            <span class="k">delete</span> <span class="nx">@subscribers</span><span class="p">[</span><span class="nx">sub</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span>
-                        <span class="k">delete</span> <span class="nx">@topics</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="nx">subscriber</span> <span class="k">in</span> <span class="nx">@publishers</span><span class="p">[</span><span class="nx">name</span><span class="p">].</span><span class="nx">subscribers</span>
+                            <span class="k">delete</span> <span class="nx">@subscribers</span><span class="p">[</span><span class="nx">subscriber</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span>
+                        <span class="k">delete</span> <span class="nx">@publishers</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span>
                     <span class="k">else</span>
-                        <span class="nv">topic.active = </span><span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-15">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-15">&#182;</a>               </div>               <p>The workhorse of the <code>publish</code> method. For a topic <code>name</code>, all
+                        <span class="nv">publisher.active = </span><span class="kc">false</span></pre></div>             </td>           </tr>                               <tr id="section-13">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-13">&#182;</a>               </div>               <p>The workhorse of the <code>publish</code> method. For a publisher <code>name</code>, all
 subscribers will their <code>forwards</code> handler be executed with <code>args</code>
 being passed in.</p>
 
-<p>Currently, only top-level publications are recorded. If the hub's
-<code>locked</code> flag is <code>true</code>, no publication is recorded.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">publish: </span><span class="nf">(name, args...) -&gt;</span>
+<p>Currently, only top-level messages are recorded. If the hub's
+<code>locked</code> flag is <code>true</code>, no message is recorded.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">publish: </span><span class="nf">(name, args...) -&gt;</span>
 
-            <span class="k">if</span> <span class="o">not</span> <span class="p">(</span><span class="nv">topic = </span><span class="nx">@topics</span><span class="p">[</span><span class="nx">name</span><span class="p">])</span>
-                <span class="nv">topic = </span><span class="nx">@topics</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Topic</span> <span class="nx">name</span>
-            <span class="k">else</span> <span class="k">if</span> <span class="o">not</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">active</span>
+            <span class="k">if</span> <span class="o">not</span> <span class="p">(</span><span class="nv">publisher = </span><span class="nx">@publishers</span><span class="p">[</span><span class="nx">name</span><span class="p">])</span>
+                <span class="nv">publisher = </span><span class="nx">@publishers</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Publisher</span> <span class="nx">name</span>
+            <span class="k">else</span> <span class="k">if</span> <span class="o">not</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">active</span>
                 <span class="k">return</span>
 
-            <span class="nv">pub = </span><span class="kc">null</span></pre></div>             </td>           </tr>                               <tr id="section-16">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-16">&#182;</a>               </div>               <p>A publication will only be recorded when it's a top-level call.
-This ensures consistency for the undo/redo stacks</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">if</span> <span class="o">not</span> <span class="nx">@locked</span> </pre></div>             </td>           </tr>                               <tr id="section-17">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-17">&#182;</a>               </div>               <p>Flush the redo before adding a new pub to prevent invalid
-references.</p>             </td>             <td class="code">               <div class="highlight"><pre>                <span class="nx">@_flushRedo</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-18">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-18">&#182;</a>               </div>               <p>Record this pub to the hub</p>             </td>             <td class="code">               <div class="highlight"><pre>                <span class="nv">pub = </span><span class="nx">@_recordPub</span><span class="p">(</span><span class="nx">topic</span><span class="p">,</span> <span class="nx">args</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-19">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-19">&#182;</a>               </div>               <p>If there are any subscribers, execute their respective <code>forwards</code>
-handlers.</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">if</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">length</span>
-                <span class="k">for</span> <span class="nx">sub</span> <span class="k">in</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">subscribers</span></pre></div>             </td>           </tr>                               <tr id="section-20">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-20">&#182;</a>               </div>               <p>Skip temporarily unsubscribed subscribers</p>             </td>             <td class="code">               <div class="highlight"><pre>                    <span class="k">if</span> <span class="o">not</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">active</span> <span class="k">then</span> <span class="k">continue</span></pre></div>             </td>           </tr>                               <tr id="section-21">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-21">&#182;</a>               </div>               <p>Create copies of <code>args</code> to ensure no side-effects
-between subscribers.</p>             </td>             <td class="code">               <div class="highlight"><pre>                    <span class="nx">@_transaction</span> <span class="nx">sub</span><span class="p">,</span> <span class="nx">pub</span><span class="p">,</span> <span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="nv">message = </span><span class="kc">null</span></pre></div>             </td>           </tr>                               <tr id="section-14">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-14">&#182;</a>               </div>               <p>A message will only be recorded when it's a top-level call.
+This ensures consistency for the undo/redo stacks</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">if</span> <span class="o">not</span> <span class="nx">@locked</span> </pre></div>             </td>           </tr>                               <tr id="section-15">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-15">&#182;</a>               </div>               <p>Flush the redo before adding a new message to prevent invalid
+references.</p>             </td>             <td class="code">               <div class="highlight"><pre>                <span class="nx">@_flush</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-16">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-16">&#182;</a>               </div>               <p>Record this message to the hub</p>             </td>             <td class="code">               <div class="highlight"><pre>                <span class="nv">message = </span><span class="nx">@_record</span><span class="p">(</span><span class="nx">publisher</span><span class="p">,</span> <span class="nx">args</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-17">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-17">&#182;</a>               </div>               <p>If there are any subscribers, execute their respective <code>forwards</code>
+handlers.</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">if</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">length</span>
+                <span class="k">for</span> <span class="nx">subscriber</span> <span class="k">in</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span></pre></div>             </td>           </tr>                               <tr id="section-18">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-18">&#182;</a>               </div>               <p>Skip temporarily unsubscribed subscribers</p>             </td>             <td class="code">               <div class="highlight"><pre>                    <span class="k">if</span> <span class="o">not</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">active</span> <span class="k">then</span> <span class="k">continue</span></pre></div>             </td>           </tr>                               <tr id="section-19">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-19">&#182;</a>               </div>               <p>Create copies of <code>args</code> to ensure no side-effects
+between subscribers.</p>             </td>             <td class="code">               <div class="highlight"><pre>                    <span class="nx">@_transaction</span> <span class="nx">subscriber</span><span class="p">,</span> <span class="nx">message</span><span class="p">,</span> <span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
-            <span class="k">return</span> <span class="nx">pub</span> <span class="o">and</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">id</span></pre></div>             </td>           </tr>                               <tr id="section-22">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-22">&#182;</a>               </div>               <p>Undo the last publication for this hub. Recursively skip any pubs
-which have an unsubscribed topic.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">undo: </span><span class="o">-&gt;</span>
+            <span class="k">return</span> <span class="nx">message</span> <span class="o">and</span> <span class="nx">message</span><span class="p">.</span><span class="nx">id</span></pre></div>             </td>           </tr>                               <tr id="section-20">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-20">&#182;</a>               </div>               <p>Undo the last message for this hub. Recursively skip any pubs
+which have an unsubscribed publisher.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">undo: </span><span class="o">-&gt;</span>
 
-            <span class="k">if</span> <span class="p">(</span><span class="nv">pub = </span><span class="nx">@undoStack</span><span class="p">.</span><span class="nx">pop</span><span class="p">())</span>
-                <span class="nx">@redoStack</span><span class="p">.</span><span class="nx">push</span> <span class="nx">pub</span>
-                <span class="k">if</span> <span class="o">not</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">topic</span><span class="p">.</span><span class="nx">active</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nv">message = </span><span class="nx">@_undos</span><span class="p">.</span><span class="nx">pop</span><span class="p">())</span>
+                <span class="nx">@_redos</span><span class="p">.</span><span class="nx">push</span> <span class="nx">message</span>
+                <span class="k">if</span> <span class="o">not</span> <span class="nx">message</span><span class="p">.</span><span class="nx">publisher</span><span class="p">.</span><span class="nx">active</span>
                     <span class="nx">@undo</span><span class="p">()</span>
                 <span class="k">else</span>
-                    <span class="nx">@_backwards</span> <span class="nx">pub</span></pre></div>             </td>           </tr>                               <tr id="section-23">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-23">&#182;</a>               </div>               <p>Redo the next publication for this hub. Recursively skip any pubs
-which have an unsubscribed topic.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">redo: </span><span class="o">-&gt;</span>
+                    <span class="nx">@_backwards</span> <span class="nx">message</span></pre></div>             </td>           </tr>                               <tr id="section-21">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-21">&#182;</a>               </div>               <p>Redo the next message for this hub. Recursively skip any pubs
+which have an unsubscribed publisher.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">redo: </span><span class="o">-&gt;</span>
 
-            <span class="k">if</span> <span class="p">(</span><span class="nv">pub = </span><span class="nx">@redoStack</span><span class="p">.</span><span class="nx">pop</span><span class="p">())</span>
-                <span class="nx">@undoStack</span><span class="p">.</span><span class="nx">push</span> <span class="nx">pub</span>
-                <span class="k">if</span> <span class="o">not</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">topic</span><span class="p">.</span><span class="nx">active</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nv">message = </span><span class="nx">@_redos</span><span class="p">.</span><span class="nx">pop</span><span class="p">())</span>
+                <span class="nx">@_undos</span><span class="p">.</span><span class="nx">push</span> <span class="nx">message</span>
+                <span class="k">if</span> <span class="o">not</span> <span class="nx">message</span><span class="p">.</span><span class="nx">publisher</span><span class="p">.</span><span class="nx">active</span>
                     <span class="nx">@redo</span><span class="p">()</span>
                 <span class="k">else</span>
-                    <span class="nx">@_forwards</span> <span class="nx">pub</span></pre></div>             </td>           </tr>                               <tr id="section-24">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-24">&#182;</a>               </div>               <p>Encapsulates a <em>new</em> <code>forwards</code> execution. This hub is locked for
+                    <span class="nx">@_forwards</span> <span class="nx">message</span></pre></div>             </td>           </tr>                               <tr id="section-22">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-22">&#182;</a>               </div>               <p>Encapsulates a <em>new</em> <code>forwards</code> execution. This hub is locked for
 the during of this call stack (relative to the handler) to prevent
-dependent publications from being recorded in the history.</p>
+dependent messages from being recorded in the messages.</p>
 
 <p>Errors must be caught here to ensure other subscribers are not
-affected downstream.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_transaction: </span><span class="nf">(sub, pub, args) -&gt;</span>
+affected downstream.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_transaction: </span><span class="nf">(subscriber, message, args) -&gt;</span>
 
             <span class="k">if</span> <span class="o">not</span> <span class="nx">@locked</span>
                 <span class="vi">@locked = </span><span class="kc">true</span>
                 <span class="k">try</span>
-                    <span class="nx">sub</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">args</span>
-                    <span class="nv">sub.last = </span><span class="nx">pub</span>
+                    <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">args</span>
+                    <span class="nv">subscriber.tip = </span><span class="nx">message</span>
                 <span class="k">finally</span>
                     <span class="vi">@locked = </span><span class="kc">false</span>
             <span class="k">else</span>
-                <span class="k">try</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">args</span></pre></div>             </td>           </tr>                               <tr id="section-25">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-25">&#182;</a>               </div>               <p>The logic behind the <code>redo</code> operation. Each active subscriber for
-the <code>pub</code>'s topic is targeted.</p>
+                <span class="k">try</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">args</span></pre></div>             </td>           </tr>                               <tr id="section-23">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-23">&#182;</a>               </div>               <p>The logic behind the <code>redo</code> operation. Each active subscriber for
+the <code>message</code>'s publisher is targeted.</p>
 
 <p>Errors must be caught here to ensure other subscribers are not
-affected downstream.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_forwards: </span><span class="nf">(pub) -&gt;</span>
+affected downstream.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_forwards: </span><span class="nf">(message) -&gt;</span>
 
-            <span class="nv">topic = </span><span class="nx">pub</span><span class="p">.</span><span class="nx">topic</span>
-            <span class="k">if</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">length</span>
-                <span class="k">for</span> <span class="nx">sub</span> <span class="k">in</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">subscribers</span>
-                    <span class="k">if</span> <span class="o">not</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">active</span> <span class="k">then</span> <span class="k">continue</span>
+            <span class="nv">publisher = </span><span class="nx">message</span><span class="p">.</span><span class="nx">publisher</span>
+            <span class="k">if</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">length</span>
+                <span class="k">for</span> <span class="nx">subscriber</span> <span class="k">in</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span>
+                    <span class="k">if</span> <span class="o">not</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">active</span> <span class="k">then</span> <span class="k">continue</span>
                     <span class="k">try</span>
-                        <span class="nx">sub</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                        <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
                     <span class="k">finally</span>
-                        <span class="nv">sub.last = </span><span class="nx">pub</span>
+                        <span class="nv">subscriber.tip = </span><span class="nx">message</span>
 
-            <span class="vi">@last = </span><span class="nx">pub</span></pre></div>             </td>           </tr>                               <tr id="section-26">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-26">&#182;</a>               </div>               <p>The logic behind the <code>undo</code> operation. Each active subscriber for
-the <code>pub</code>'s topic is targeted. If the <code>backwards</code> handler is not
+            <span class="vi">@tip = </span><span class="nx">message</span></pre></div>             </td>           </tr>                               <tr id="section-24">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-24">&#182;</a>               </div>               <p>The logic behind the <code>undo</code> operation. Each active subscriber for
+the <code>message</code>'s publisher is targeted. If the <code>backwards</code> handler is not
 defined, the <code>forwards</code> handler will be used with the previous
-publication's <code>args</code> for the topic to mimic the last state.</p>
+message's <code>args</code> for the publisher to mimic the last state.</p>
 
 <p>Errors must be caught here to ensure other subscribers are not
-affected downstream.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_backwards: </span><span class="nf">(pub) -&gt;</span>
+affected downstream.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_backwards: </span><span class="nf">(message) -&gt;</span>
 
-            <span class="nv">topic = </span><span class="nx">pub</span><span class="p">.</span><span class="nx">topic</span>
-            <span class="k">if</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">length</span>
-                <span class="k">for</span> <span class="nx">sub</span> <span class="k">in</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">subscribers</span>
-                    <span class="k">if</span> <span class="o">not</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">active</span> <span class="k">then</span> <span class="k">continue</span>
+            <span class="nv">publisher = </span><span class="nx">message</span><span class="p">.</span><span class="nx">publisher</span>
+            <span class="k">if</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">length</span>
+                <span class="k">for</span> <span class="nx">subscriber</span> <span class="k">in</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span>
+                    <span class="k">if</span> <span class="o">not</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">active</span> <span class="k">then</span> <span class="k">continue</span>
 
                     <span class="k">try</span>
-                        <span class="k">if</span> <span class="o">not</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">backwards</span>
-                            <span class="k">if</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">prev</span>
-                                <span class="nx">sub</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">prev</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="o">not</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">backwards</span>
+                            <span class="k">if</span> <span class="nx">message</span><span class="p">.</span><span class="nx">previous</span>
+                                <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">previous</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
                             <span class="k">else</span>
-                                <span class="nx">sub</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">context</span>
+                                <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span>
                         <span class="k">else</span>
-                            <span class="nx">sub</span><span class="p">.</span><span class="nx">backwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">sub</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">pub</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                            <span class="nx">subscriber</span><span class="p">.</span><span class="nx">backwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
                     <span class="k">finally</span>
-                        <span class="nv">sub.last = </span><span class="nx">pub</span>
+                        <span class="nv">subscriber.tip = </span><span class="nx">message</span>
 
-            <span class="vi">@last = </span><span class="nx">pub</span></pre></div>             </td>           </tr>                               <tr id="section-27">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-27">&#182;</a>               </div>               <p>Takes each pub in the <code>redoStack</code> and removes and  deferences them
-from the respective <code>topic</code> and the hub.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_flushRedo: </span><span class="o">-&gt;</span>
-
-            <span class="k">for</span> <span class="nx">_</span> <span class="k">in</span> <span class="nx">@redoStack</span>
-                <span class="nv">pub = </span><span class="nx">@redoStack</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
-                <span class="nx">pub</span><span class="p">.</span><span class="nx">topic</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
-                <span class="k">delete</span> <span class="nx">@publications</span><span class="p">[</span><span class="nx">pub</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-28">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-28">&#182;</a>               </div>               <p>Create a new <code>pub</code>, store a reference to the last pub relative
-to the topic. This is for idempotent (or those without a
+            <span class="vi">@tip = </span><span class="nx">message</span></pre></div>             </td>           </tr>                               <tr id="section-25">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-25">&#182;</a>               </div>               <p>Takes each message in the <code>_redos</code> and removes and  deferences them
+from the respective <code>publisher</code> and the hub.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_flush: </span><span class="o">-&gt;</span>
+            <span class="k">for</span> <span class="nx">_</span> <span class="k">in</span> <span class="nx">@_redos</span>
+                <span class="nv">message = </span><span class="nx">@_redos</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+                <span class="nx">message</span><span class="p">.</span><span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
+                <span class="k">delete</span> <span class="nx">@messages</span><span class="p">[</span><span class="nx">message</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span></pre></div>             </td>           </tr>                               <tr id="section-26">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-26">&#182;</a>               </div>               <p>Create a new <code>message</code>, store a reference to the last message relative
+to the publisher. This is for idempotent (or those without a
 <code>backwards</code> handler) subscribers.</p>
 
-<p>This <code>pub</code> is added to the topic history, the undo stack and
-is set as the hub's <code>last</code> pub.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_recordPub: </span><span class="nf">(topic, args) -&gt;</span>
+<p>This <code>message</code> is added to the publisher messages, the undo stack and
+is set as the hub's <code>tip</code> message.</p>
 
-            <span class="nv">pub = </span><span class="k">new</span> <span class="nx">Pub</span> <span class="nx">topic</span><span class="p">,</span> <span class="nx">args</span><span class="p">,</span> <span class="nx">topic</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">last</span><span class="p">()</span>
-            <span class="nx">@publications</span><span class="p">[</span><span class="nx">pub</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span> <span class="o">=</span> <span class="nx">pub</span>
-            <span class="nx">topic</span><span class="p">.</span><span class="nx">history</span><span class="p">.</span><span class="nx">push</span> <span class="nx">pub</span>
-            <span class="nx">@undoStack</span><span class="p">.</span><span class="nx">push</span> <span class="nx">pub</span>
-            <span class="vi">@last = </span><span class="nx">pub</span>
+<p>If <code>undoStackSize</code> has been defined, the oldest undo will be shifted off the
+front of the stack.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_record: </span><span class="nf">(publisher, args) -&gt;</span>
+            <span class="nv">message = </span><span class="k">new</span> <span class="nx">Message</span> <span class="nx">publisher</span><span class="p">,</span> <span class="nx">args</span><span class="p">,</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span><span class="p">.</span><span class="nx">last</span><span class="p">()</span>
+            <span class="nx">@messages</span><span class="p">[</span><span class="nx">message</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span> <span class="o">=</span> <span class="nx">message</span>
+            <span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span><span class="p">.</span><span class="nx">push</span> <span class="nx">message</span>
 
+            <span class="k">if</span> <span class="nx">@undoStackSize</span> <span class="o">and</span> <span class="nx">@_undos</span><span class="p">.</span><span class="nx">length</span> <span class="o">is</span> <span class="nx">@undoStackSize</span>
+                <span class="nx">@_undos</span><span class="p">.</span><span class="nx">shift</span><span class="p">()</span>
+            <span class="nx">@_undos</span><span class="p">.</span><span class="nx">push</span> <span class="nx">message</span>
+
+            <span class="vi">@tip = </span><span class="nx">message</span>
 
 
     <span class="nv">PubSub.fn.init:: = </span><span class="nx">PubSub</span><span class="p">.</span><span class="nx">fn</span>

@@ -1,263 +1,265 @@
 var __slice = Array.prototype.slice;
 (function(window) {
-  var Pub, PubSub, Sub, Topic, puid, suid;
+  var Message, PubSub, Publisher, Subscriber, muid, suid;
   if (!Array.prototype.last) {
     Array.prototype.last = function() {
       return this[this.length - 1];
     };
   }
-  puid = 1;
+  muid = 1;
   suid = 1;
-  Sub = function(topic, forwards, backwards, context) {
+  Subscriber = function(publisher, forwards, backwards, context) {
     this.id = suid++;
-    this.topic = topic;
+    this.publisher = publisher;
     this.forwards = forwards;
     this.backwards = backwards;
     this.context = context || this;
     this.active = true;
+    this.tip = null;
     return this;
   };
-  Pub = function(topic, args, prev) {
-    this.id = puid++;
-    this.topic = topic;
+  Message = function(publisher, args, previous) {
+    this.id = muid++;
+    this.publisher = publisher;
     this.args = args;
-    this.prev = prev;
+    this.previous = previous;
     return this;
   };
-  Topic = function(name) {
+  Publisher = function(name) {
     this.name = name;
     this.subscribers = [];
-    this.history = [];
+    this.messages = [];
     this.active = true;
     return this;
   };
-  PubSub = function() {
-    return new PubSub.fn.init();
+  PubSub = function(undoStackSize) {
+    return new PubSub.fn.init(undoStackSize);
   };
-  PubSub.version = '0.1';
+  PubSub.version = '0.2';
   PubSub.fn = PubSub.prototype = {
     constructor: PubSub,
-    init: function() {
-      this.topics = {};
-      this.publications = {};
+    init: function(undoStackSize) {
+      this.undoStackSize = undoStackSize;
+      this.publishers = {};
       this.subscribers = {};
-      this.undoStack = [];
-      this.redoStack = [];
+      this.messages = {};
+      this.tip = null;
+      this._undos = [];
+      this._redos = [];
       return this;
     },
     subscribe: function(name, forwards, backwards, context, history) {
-      var pub, publish, sub, topic, _i, _len, _ref;
+      var message, messages, publish, publisher, subscriber, _i, _len;
       if (history == null) {
         history = 'full';
       }
       if (typeof name === 'number') {
-        if (!(sub = this.subscribers[name])) {
+        if (!(subscriber = this.subscribers[name])) {
           return;
         }
-        sub.active = true;
-        topic = sub.topic;
+        subscriber.active = true;
+        publisher = subscriber.publisher;
         publish = forwards || publish;
       } else {
-        if (!(topic = this.topics[name])) {
-          topic = this.topics[name] = new Topic(name);
+        if (!(publisher = this.publishers[name])) {
+          publisher = this.publishers[name] = new Publisher(name);
         } else if (!forwards || typeof forwards !== 'function') {
-          topic.active = true;
+          publisher.active = true;
           return;
         }
-        sub = new Sub(topic, forwards, backwards, context);
-        this.subscribers[sub.id] = sub;
-        topic.subscribers.push(sub);
+        subscriber = new Subscriber(publisher, forwards, backwards, context);
+        this.subscribers[subscriber.id] = subscriber;
+        publisher.subscribers.push(subscriber);
       }
-      if (history && topic.history.length) {
+      if (publisher.messages.length) {
         switch (history) {
           case 'full':
-            _ref = topic.history;
-            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-              pub = _ref[_i];
-              if (pub.id > this.last.id) {
-                break;
-              }
-              if (sub.last && sub.last.id >= pub.id) {
-                continue;
-              }
-              sub.forwards.apply(sub.context, pub.args);
-            }
+            messages = publisher.messages;
             break;
           case 'tip':
-            pub = topic.history.last();
-            if (pub.id > this.last.id) {
-              return;
-            }
-            if (sub.last && sub.last.id >= pub.id) {
-              return;
-            }
-            sub.forwards.apply(sub.context, pub.args);
+            messages = [publisher.messages.last()];
+            break;
+          default:
+            messages = [];
         }
-        sub.last = pub;
+        for (_i = 0, _len = messages.length; _i < _len; _i++) {
+          message = messages[_i];
+          if (message.id > this.tip.id) {
+            break;
+          }
+          if (subscriber.tip && subscriber.tip.id >= message.id) {
+            continue;
+          }
+          subscriber.forwards.apply(subscriber.context, message.args);
+        }
+        subscriber.tip = message;
       }
-      return sub.id;
+      return subscriber.id;
     },
     unsubscribe: function(name, hard) {
-      var len, sub, subscribers, topic, _i, _len, _ref, _results;
+      var len, publisher, subscriber, subscribers, _i, _len, _ref, _results;
       if (hard == null) {
         hard = false;
       }
       if (typeof name === 'number') {
-        sub = this.subscribers[name];
+        subscriber = this.subscribers[name];
         if (hard) {
           delete this.subscribers[name];
-          subscribers = sub.topic.subscribers;
+          subscribers = subscriber.publisher.subscribers;
           len = subscribers.length;
           _results = [];
           while (len--) {
-            _results.push(sub.id === subscribers[len].id ? subscribers.splice(len, 1) : void 0);
+            _results.push(subscriber.id === subscribers[len].id ? subscribers.splice(len, 1) : void 0);
           }
           return _results;
         } else {
-          return sub.active = false;
+          return subscriber.active = false;
         }
       } else {
-        if ((topic = this.topics[name])) {
+        if ((publisher = this.publishers[name])) {
           if (hard) {
-            _ref = this.topics[name].subscribers;
+            _ref = this.publishers[name].subscribers;
             for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-              sub = _ref[_i];
-              delete this.subscribers[sub.id];
+              subscriber = _ref[_i];
+              delete this.subscribers[subscriber.id];
             }
-            return delete this.topics[name];
+            return delete this.publishers[name];
           } else {
-            return topic.active = false;
+            return publisher.active = false;
           }
         }
       }
     },
     publish: function() {
-      var args, name, pub, sub, topic, _i, _len, _ref;
+      var args, message, name, publisher, subscriber, _i, _len, _ref;
       name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      if (!(topic = this.topics[name])) {
-        topic = this.topics[name] = new Topic(name);
-      } else if (!topic.active) {
+      if (!(publisher = this.publishers[name])) {
+        publisher = this.publishers[name] = new Publisher(name);
+      } else if (!publisher.active) {
         return;
       }
-      pub = null;
+      message = null;
       if (!this.locked) {
-        this._flushRedo();
-        pub = this._recordPub(topic, args);
+        this._flush();
+        message = this._record(publisher, args);
       }
-      if (topic.subscribers.length) {
-        _ref = topic.subscribers;
+      if (publisher.subscribers.length) {
+        _ref = publisher.subscribers;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          sub = _ref[_i];
-          if (!sub.active) {
+          subscriber = _ref[_i];
+          if (!subscriber.active) {
             continue;
           }
-          this._transaction(sub, pub, args.slice(0));
+          this._transaction(subscriber, message, args.slice(0));
         }
       }
-      return pub && pub.id;
+      return message && message.id;
     },
     undo: function() {
-      var pub;
-      if ((pub = this.undoStack.pop())) {
-        this.redoStack.push(pub);
-        if (!pub.topic.active) {
+      var message;
+      if ((message = this._undos.pop())) {
+        this._redos.push(message);
+        if (!message.publisher.active) {
           return this.undo();
         } else {
-          return this._backwards(pub);
+          return this._backwards(message);
         }
       }
     },
     redo: function() {
-      var pub;
-      if ((pub = this.redoStack.pop())) {
-        this.undoStack.push(pub);
-        if (!pub.topic.active) {
+      var message;
+      if ((message = this._redos.pop())) {
+        this._undos.push(message);
+        if (!message.publisher.active) {
           return this.redo();
         } else {
-          return this._forwards(pub);
+          return this._forwards(message);
         }
       }
     },
-    _transaction: function(sub, pub, args) {
+    _transaction: function(subscriber, message, args) {
       if (!this.locked) {
         this.locked = true;
         try {
-          sub.forwards.apply(sub.context, args);
-          return sub.last = pub;
+          subscriber.forwards.apply(subscriber.context, args);
+          return subscriber.tip = message;
         } finally {
           this.locked = false;
         }
       } else {
         try {
-          return sub.forwards.apply(sub.context, args);
+          return subscriber.forwards.apply(subscriber.context, args);
         } catch (_e) {}
       }
     },
-    _forwards: function(pub) {
-      var sub, topic, _i, _len, _ref;
-      topic = pub.topic;
-      if (topic.subscribers.length) {
-        _ref = topic.subscribers;
+    _forwards: function(message) {
+      var publisher, subscriber, _i, _len, _ref;
+      publisher = message.publisher;
+      if (publisher.subscribers.length) {
+        _ref = publisher.subscribers;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          sub = _ref[_i];
-          if (!sub.active) {
+          subscriber = _ref[_i];
+          if (!subscriber.active) {
             continue;
           }
           try {
-            sub.forwards.apply(sub.context, pub.args.slice(0));
+            subscriber.forwards.apply(subscriber.context, message.args.slice(0));
           } finally {
-            sub.last = pub;
+            subscriber.tip = message;
           }
         }
       }
-      return this.last = pub;
+      return this.tip = message;
     },
-    _backwards: function(pub) {
-      var sub, topic, _i, _len, _ref;
-      topic = pub.topic;
-      if (topic.subscribers.length) {
-        _ref = topic.subscribers;
+    _backwards: function(message) {
+      var publisher, subscriber, _i, _len, _ref;
+      publisher = message.publisher;
+      if (publisher.subscribers.length) {
+        _ref = publisher.subscribers;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          sub = _ref[_i];
-          if (!sub.active) {
+          subscriber = _ref[_i];
+          if (!subscriber.active) {
             continue;
           }
           try {
-            if (!sub.backwards) {
-              if (pub.prev) {
-                sub.forwards.apply(sub.context, pub.prev.args.slice(0));
+            if (!subscriber.backwards) {
+              if (message.previous) {
+                subscriber.forwards.apply(subscriber.context, message.previous.args.slice(0));
               } else {
-                sub.forwards.apply(sub.context);
+                subscriber.forwards.apply(subscriber.context);
               }
             } else {
-              sub.backwards.apply(sub.context, pub.args.slice(0));
+              subscriber.backwards.apply(subscriber.context, message.args.slice(0));
             }
           } finally {
-            sub.last = pub;
+            subscriber.tip = message;
           }
         }
       }
-      return this.last = pub;
+      return this.tip = message;
     },
-    _flushRedo: function() {
-      var pub, _, _i, _len, _ref, _results;
-      _ref = this.redoStack;
+    _flush: function() {
+      var message, _, _i, _len, _ref, _results;
+      _ref = this._redos;
       _results = [];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         _ = _ref[_i];
-        pub = this.redoStack.shift();
-        pub.topic.history.pop();
-        _results.push(delete this.publications[pub.id]);
+        message = this._redos.shift();
+        message.publisher.messages.pop();
+        _results.push(delete this.messages[message.id]);
       }
       return _results;
     },
-    _recordPub: function(topic, args) {
-      var pub;
-      pub = new Pub(topic, args, topic.history.last());
-      this.publications[pub.id] = pub;
-      topic.history.push(pub);
-      this.undoStack.push(pub);
-      return this.last = pub;
+    _record: function(publisher, args) {
+      var message;
+      message = new Message(publisher, args, publisher.messages.last());
+      this.messages[message.id] = message;
+      publisher.messages.push(message);
+      if (this.undoStackSize && this._undos.length === this.undoStackSize) {
+        this._undos.shift();
+      }
+      this._undos.push(message);
+      return this.tip = message;
     }
   };
   PubSub.fn.init.prototype = PubSub.fn;

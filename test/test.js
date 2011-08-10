@@ -20,7 +20,7 @@ test('Subscribe', 3, function() {
   sid = hub.subscribe('foo', function(msg) {
     return output = msg;
   });
-  ok(hub.topics.foo, 'a new topic has been added');
+  ok(hub.publishers.foo, 'a new topic has been added');
   ok(hub.subscribers[sid], 'the subscriber has been added');
   return equals(output, null, 'nothing changed yet');
 });
@@ -35,17 +35,17 @@ test('Subscribe - late', 6, function() {
     return output++;
   });
   equals(output, 3, 'all history up to this point');
-  equals(hub.subscribers[s1].last.id, p3, 'last pub is referenced');
+  equals(hub.subscribers[s1].tip.id, p3, 'last pub is referenced');
   s2 = hub.subscribe('foo', function() {
     return output++;
   }, null, null, 'tip');
   equals(output, 4, 'only the tip of the history was executed');
-  equals(hub.subscribers[s2].last.id, p3, 'last pub is referenced');
+  equals(hub.subscribers[s2].tip.id, p3, 'last pub is referenced');
   s3 = hub.subscribe('foo', function() {
     return output++;
   }, null, null, false);
   equals(output, 4, 'none of the history is applied');
-  return equals(hub.subscribers[s3].last, null, 'no pub has been applied');
+  return equals(hub.subscribers[s3].tip, null, 'no pub has been applied');
 });
 test('Unsubscribe & Re-subscribe', 3, function() {
   var hub, output, s1;

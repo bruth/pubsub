@@ -10,44 +10,46 @@ do (window) ->
     # Add helper function to Array
     if not Array::last then Array::last = -> @[this.length - 1]
 
-    # Internal unique identifiers for publications and subscribers
-    puid = 1
+    # Internal unique identifiers for messages and subscribers
+    muid = 1
     suid = 1
 
-    # Sub
-    # ---
+    # Subscriber
+    # ----------
     # Simple constructor to encapsulate a subscriber
-    Sub = (topic, forwards, backwards, context) ->
+    Subscriber = (publisher, forwards, backwards, context) ->
         @id = suid++
-        @topic = topic
+        @publisher = publisher
         @forwards = forwards
         @backwards = backwards
         @context = context or @
         @active = true
+        @tip = null
         @
 
-    # Pub
-    # ---
+    # Message
+    # -------
     # Simple constructor to encapsulate a top-level publishing
-    Pub = (topic, args, prev) ->
-        @id = puid++
-        @topic = topic
+    Message = (publisher, args, previous) ->
+        @id = muid++
+        @publisher = publisher
         @args = args
-        @prev = prev
+        @previous = previous
         @
 
-    # Topic
-    # -----
-    # Simple constructor to encapsulate a single topic. all ``subscribers``
-    # and publish ``history`` references for this topic are stored here.
-    Topic = (name) ->
+    # Publisher
+    # ---------
+    # Simple constructor to encapsulate a single publisher. all ``subscribers``
+    # and messages ``messages`` references for this publisher are stored here.
+    Publisher = (name) ->
         @name = name
         @subscribers = []
-        @history = []
+        @messages = []
         @active = true
         @
 
-    PubSub = -> new PubSub.fn.init()
+    PubSub = (undoStackSize) ->
+        new PubSub.fn.init(undoStackSize)
 
     PubSub.version = '@VERSION'
 
@@ -55,15 +57,21 @@ do (window) ->
 
         constructor: PubSub
 
-        init: ->
-            @topics = {}
-            @publications = {}
+        # The ``PubSub`` constructor takes a single optional argument
+        # ``undoStackSize`` which specifies a limit to the undo stack size. If
+        # it reaches the limit, the oldest undo will be shifted off
+        init: (undoStackSize) ->
+            @undoStackSize = undoStackSize
+
+            @publishers = {}
             @subscribers = {}
-            @undoStack = []
-            @redoStack = []
+            @messages = {}
+            @tip = null
+            @_undos = []
+            @_redos = []
             @
 
-        # Subscribes a handler for the given topic. For [idempotent][1]
+        # Subscribes a handler for the given publisher. For [idempotent][1]
         # subscribers, only the ``forwards`` handler is required. For
         # non-idempotent subscribers a ``backwards`` handler must also be
         # defined to ensure consistency during undo/redo operations.
@@ -73,239 +81,236 @@ do (window) ->
         #
         # The ``history`` parameter can be supplied to ensure this subscriber
         # "catches up" in state. ``full`` (default) can be supplied to
-        # apply the full publication history for this topic. ``tip`` can be
-        # supplied to only execute the last publication on the queue.
+        # apply the full message messages for this publisher. ``tip`` can be
+        # supplied to only execute the last message on the queue.
         #
-        # A sub IDcan passed in to _resume_ a previous subscription.
+        # A subscriber ID can be passed in to _resume_ a previous subscription.
         # If this method is used, a second parameter can be supplied to
-        # specify whether the subscriber should apply this topic's publish
-        # history. If a topic ``name`` is passed in without a ``forwards``
-        # handler, the topic will be re-activated.
+        # specify whether the subscriber should apply this publisher's publish
+        # messages. If a publisher ``name`` is passed in without a ``forwards``
+        # handler, the publisher will be re-activated.
         #
         # [1]: http://en.wikipedia.org/wiki/Idempotence
         subscribe: (name, forwards, backwards, context, history='full') ->
 
             if typeof name is 'number'
-                if not (sub = @subscribers[name]) then return
-                sub.active = true
-                topic = sub.topic
+                if not (subscriber = @subscribers[name]) then return
+                subscriber.active = true
+                publisher = subscriber.publisher
                 publish = forwards or publish
             else
-                if not (topic = @topics[name])
-                    topic = @topics[name] = new Topic name
+                if not (publisher = @publishers[name])
+                    publisher = @publishers[name] = new Publisher name
 
                 else if not forwards or typeof forwards isnt 'function'
-                    topic.active = true
+                    publisher.active = true
                     return
 
-                sub = new Sub topic, forwards, backwards, context
+                subscriber = new Subscriber publisher, forwards, backwards, context
 
-                @subscribers[sub.id] = sub
-                topic.subscribers.push sub
+                @subscribers[subscriber.id] = subscriber
+                publisher.subscribers.push subscriber
 
-            if history and topic.history.length
-                switch history 
+            # Ensure this new subscriber does not go past the hub's current
+            # state and does not respond to a former message.
+            if publisher.messages.length
+                switch history
                     when 'full'
-                        for pub in topic.history
-                            # Ensure this subscriber does not go past the
-                            # app's current state
-                            if pub.id > @last.id
-                                break
-                            # The subscriber's last publication may be later than
-                            # the current ``pub``. If so, skip it.
-                            if sub.last and sub.last.id >= pub.id
-                                continue
-
-                            # Apply the ``forwards`` handler 
-                            sub.forwards.apply sub.context, pub.args
-
+                        messages = publisher.messages
                     when 'tip'
-                        pub = topic.history.last()
-                        # Ensure this new subscriber does not go past the
-                        # app's current state and does not duplicate a response
-                        # to a former publication.
-                        if pub.id > @last.id then return
-                        if sub.last and sub.last.id >= pub.id then return
-                        sub.forwards.apply sub.context, pub.args
+                        messages = [publisher.messages.last()]
+                    else
+                        messages = []
 
-                sub.last = pub
+                for message in messages
+                    if message.id > @tip.id
+                        break
+                    if subscriber.tip and subscriber.tip.id >= message.id
+                        continue
+                    subscriber.forwards.apply subscriber.context, message.args
+
+                subscriber.tip = message
 
             # return the subscriber id for later reference in the application
-            return sub.id
+            return subscriber.id
 
-        # Unsubscribe all subscribers for a given ``topic`` is a topic name is
+        # Unsubscribe all subscribers for a given ``publisher`` is a publisher name is
         # supplied or unsubscribe a subscriber via their ``id``. If ``remove``
         # is ``true``, all references to the unsubscribed object will be
         # deleted from this hub.
         unsubscribe: (name, hard=false) ->
 
             if typeof name is 'number'
-                sub = @subscribers[name]
+                subscriber = @subscribers[name]
                 if hard
                     delete @subscribers[name]
-                    subscribers = sub.topic.subscribers
+                    subscribers = subscriber.publisher.subscribers
                     len = subscribers.length
                     while len--
-                        if sub.id is subscribers[len].id
+                        if subscriber.id is subscribers[len].id
                             subscribers.splice len, 1
                 else
-                    sub.active = false
+                    subscriber.active = false
 
-            # Handles unsubscribing a whole topic, i.e. it will no longer
-            # broadcast or record new publications.
+            # Handles unsubscribing a whole publisher, i.e. it will no longer
+            # broadcast or record new messages.
             else
-                if (topic = @topics[name])
+                if (publisher = @publishers[name])
                     if hard 
-                        for sub in @topics[name].subscribers
-                            delete @subscribers[sub.id]
-                        delete @topics[name]
+                        for subscriber in @publishers[name].subscribers
+                            delete @subscribers[subscriber.id]
+                        delete @publishers[name]
                     else
-                        topic.active = false
+                        publisher.active = false
 
-        # The workhorse of the ``publish`` method. For a topic ``name``, all
+        # The workhorse of the ``publish`` method. For a publisher ``name``, all
         # subscribers will their ``forwards`` handler be executed with ``args``
         # being passed in.
         #
-        # Currently, only top-level publications are recorded. If the hub's
-        # ``locked`` flag is ``true``, no publication is recorded.
+        # Currently, only top-level messages are recorded. If the hub's
+        # ``locked`` flag is ``true``, no message is recorded.
         publish: (name, args...) ->
 
-            if not (topic = @topics[name])
-                topic = @topics[name] = new Topic name
-            else if not topic.active
+            if not (publisher = @publishers[name])
+                publisher = @publishers[name] = new Publisher name
+            else if not publisher.active
                 return
 
-            pub = null
+            message = null
 
-            # A publication will only be recorded when it's a top-level call.
+            # A message will only be recorded when it's a top-level call.
             # This ensures consistency for the undo/redo stacks
             if not @locked 
-                # Flush the redo before adding a new pub to prevent invalid
+                # Flush the redo before adding a new message to prevent invalid
                 # references.
-                @_flushRedo()
-                # Record this pub to the hub
-                pub = @_recordPub(topic, args)
+                @_flush()
+                # Record this message to the hub
+                message = @_record(publisher, args)
 
             # If there are any subscribers, execute their respective ``forwards``
             # handlers.
-            if topic.subscribers.length
-                for sub in topic.subscribers
+            if publisher.subscribers.length
+                for subscriber in publisher.subscribers
                     # Skip temporarily unsubscribed subscribers
-                    if not sub.active then continue
+                    if not subscriber.active then continue
                     # Create copies of ``args`` to ensure no side-effects
                     # between subscribers.
-                    @_transaction sub, pub, args.slice(0)
+                    @_transaction subscriber, message, args.slice(0)
 
-            return pub and pub.id
+            return message and message.id
 
-        # Undo the last publication for this hub. Recursively skip any pubs
-        # which have an unsubscribed topic.
+        # Undo the last message for this hub. Recursively skip any pubs
+        # which have an unsubscribed publisher.
         undo: ->
 
-            if (pub = @undoStack.pop())
-                @redoStack.push pub
-                if not pub.topic.active
+            if (message = @_undos.pop())
+                @_redos.push message
+                if not message.publisher.active
                     @undo()
                 else
-                    @_backwards pub
+                    @_backwards message
 
-        # Redo the next publication for this hub. Recursively skip any pubs
-        # which have an unsubscribed topic.
+        # Redo the next message for this hub. Recursively skip any pubs
+        # which have an unsubscribed publisher.
         redo: ->
 
-            if (pub = @redoStack.pop())
-                @undoStack.push pub
-                if not pub.topic.active
+            if (message = @_redos.pop())
+                @_undos.push message
+                if not message.publisher.active
                     @redo()
                 else
-                    @_forwards pub
+                    @_forwards message
 
         # Encapsulates a _new_ ``forwards`` execution. This hub is locked for
         # the during of this call stack (relative to the handler) to prevent
-        # dependent publications from being recorded in the history.
+        # dependent messages from being recorded in the messages.
         #
         # Errors must be caught here to ensure other subscribers are not
         # affected downstream.
-        _transaction: (sub, pub, args) ->
+        _transaction: (subscriber, message, args) ->
 
             if not @locked
                 @locked = true
                 try
-                    sub.forwards.apply sub.context, args
-                    sub.last = pub
+                    subscriber.forwards.apply subscriber.context, args
+                    subscriber.tip = message
                 finally
                     @locked = false
             else
-                try sub.forwards.apply sub.context, args
+                try subscriber.forwards.apply subscriber.context, args
 
         # The logic behind the ``redo`` operation. Each active subscriber for
-        # the ``pub``'s topic is targeted.
+        # the ``message``'s publisher is targeted.
         #
         # Errors must be caught here to ensure other subscribers are not
         # affected downstream.
-        _forwards: (pub) ->
+        _forwards: (message) ->
 
-            topic = pub.topic
-            if topic.subscribers.length
-                for sub in topic.subscribers
-                    if not sub.active then continue
+            publisher = message.publisher
+            if publisher.subscribers.length
+                for subscriber in publisher.subscribers
+                    if not subscriber.active then continue
                     try
-                        sub.forwards.apply sub.context, pub.args.slice(0)
+                        subscriber.forwards.apply subscriber.context, message.args.slice(0)
                     finally
-                        sub.last = pub
+                        subscriber.tip = message
 
-            @last = pub
+            @tip = message
 
         # The logic behind the ``undo`` operation. Each active subscriber for
-        # the ``pub``'s topic is targeted. If the ``backwards`` handler is not
+        # the ``message``'s publisher is targeted. If the ``backwards`` handler is not
         # defined, the ``forwards`` handler will be used with the previous
-        # publication's ``args`` for the topic to mimic the last state.
+        # message's ``args`` for the publisher to mimic the last state.
         #
         # Errors must be caught here to ensure other subscribers are not
         # affected downstream.
-        _backwards: (pub) ->
+        _backwards: (message) ->
 
-            topic = pub.topic
-            if topic.subscribers.length
-                for sub in topic.subscribers
-                    if not sub.active then continue
+            publisher = message.publisher
+            if publisher.subscribers.length
+                for subscriber in publisher.subscribers
+                    if not subscriber.active then continue
 
                     try
-                        if not sub.backwards
-                            if pub.prev
-                                sub.forwards.apply sub.context, pub.prev.args.slice(0)
+                        if not subscriber.backwards
+                            if message.previous
+                                subscriber.forwards.apply subscriber.context, message.previous.args.slice(0)
                             else
-                                sub.forwards.apply sub.context
+                                subscriber.forwards.apply subscriber.context
                         else
-                            sub.backwards.apply sub.context, pub.args.slice(0)
+                            subscriber.backwards.apply subscriber.context, message.args.slice(0)
                     finally
-                        sub.last = pub
+                        subscriber.tip = message
 
-            @last = pub
+            @tip = message
 
-        # Takes each pub in the ``redoStack`` and removes and  deferences them
-        # from the respective ``topic`` and the hub.
-        _flushRedo: ->
+        # Takes each message in the ``_redos`` and removes and  deferences them
+        # from the respective ``publisher`` and the hub.
+        _flush: ->
+            for _ in @_redos
+                message = @_redos.shift()
+                message.publisher.messages.pop()
+                delete @messages[message.id]
 
-            for _ in @redoStack
-                pub = @redoStack.shift()
-                pub.topic.history.pop()
-                delete @publications[pub.id]
-
-        # Create a new ``pub``, store a reference to the last pub relative
-        # to the topic. This is for idempotent (or those without a
+        # Create a new ``message``, store a reference to the last message relative
+        # to the publisher. This is for idempotent (or those without a
         # ``backwards`` handler) subscribers.
         # 
-        # This ``pub`` is added to the topic history, the undo stack and
-        # is set as the hub's ``last`` pub.
-        _recordPub: (topic, args) ->
+        # This ``message`` is added to the publisher messages, the undo stack and
+        # is set as the hub's ``tip`` message.
+        #
+        # If ``undoStackSize`` has been defined, the oldest undo will be shifted off the
+        # front of the stack.
+        _record: (publisher, args) ->
+            message = new Message publisher, args, publisher.messages.last()
+            @messages[message.id] = message
+            publisher.messages.push message
 
-            pub = new Pub topic, args, topic.history.last()
-            @publications[pub.id] = pub
-            topic.history.push pub
-            @undoStack.push pub
-            @last = pub
+            if @undoStackSize and @_undos.length is @undoStackSize
+                @_undos.shift()
+            @_undos.push message
 
+            @tip = message
 
 
     PubSub.fn.init:: = PubSub.fn

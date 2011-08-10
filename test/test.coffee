@@ -22,7 +22,7 @@ test 'Subscribe', 3, ->
     sid = hub.subscribe 'foo', (msg) ->
         output = msg
 
-    ok hub.topics.foo, 'a new topic has been added'
+    ok hub.publishers.foo, 'a new topic has been added'
     ok hub.subscribers[sid], 'the subscriber has been added'
     equals output, null, 'nothing changed yet'
 
@@ -39,21 +39,21 @@ test 'Subscribe - late', 6, ->
         output++
 
     equals output, 3, 'all history up to this point'
-    equals hub.subscribers[s1].last.id, p3, 'last pub is referenced'
+    equals hub.subscribers[s1].tip.id, p3, 'last pub is referenced'
 
     s2 = hub.subscribe 'foo', ->
         output++
     , null, null, 'tip'
 
     equals output, 4, 'only the tip of the history was executed'
-    equals hub.subscribers[s2].last.id, p3, 'last pub is referenced'
+    equals hub.subscribers[s2].tip.id, p3, 'last pub is referenced'
 
     s3 = hub.subscribe 'foo', ->
         output++
     , null, null, false
 
     equals output, 4, 'none of the history is applied'
-    equals hub.subscribers[s3].last, null, 'no pub has been applied'
+    equals hub.subscribers[s3].tip, null, 'no pub has been applied'
 
 
 test 'Unsubscribe & Re-subscribe', 3, ->
