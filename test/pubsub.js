@@ -42,6 +42,21 @@ var __slice = Array.prototype.slice;
       this.messages = [];
       this.active = true;
     }
+    Publisher.prototype._add = function(subscriber) {
+      return this.subscribers.push(subscriber);
+    };
+    Publisher.prototype._remove = function(subscriber) {
+      var len, _results;
+      len = this.subscribers.length;
+      _results = [];
+      while (len--) {
+        if (subscriber === this.subscribers[len]) {
+          this.subscriber.pop(len);
+          break;
+        }
+      }
+      return _results;
+    };
     Publisher.prototype.tip = function() {
       return this.messages[this.messages.length - 1];
     };
@@ -70,33 +85,39 @@ var __slice = Array.prototype.slice;
       this.undos = [];
       this.redos = [];
     }
+    PubSub.prototype._addPublisher = function(topic) {
+      var publisher;
+      if (!(publisher = this.publishers[topic])) {
+        publisher = new Publisher(this, topic);
+        this.publishers[topic] = publisher;
+      }
+      return publisher;
+    };
+    PubSub.prototype._addSubscriber = function(publisher, forwards, backwards, context) {
+      var subscriber;
+      subscriber = new Subscriber(publisher, forwards, backwards, context);
+      this.subscribers[subscriber.id] = subscriber;
+      publisher._add(subscriber);
+      return subscriber;
+    };
     PubSub.prototype.subscribe = function(topic, forwards, backwards, context, migrate) {
-      var publish, publisher, subscriber;
+      var publisher, subscriber;
       if (migrate == null) {
         migrate = true;
       }
-      if (typeof topic === 'number') {
-        if (!(subscriber = this.subscribers[topic])) {
-          return;
-        }
+      if (topic instanceof Subscriber) {
+        subscriber = topic;
         subscriber.online = true;
         publisher = subscriber.publisher;
-        publish = forwards || publish;
+        migrate = forwards || migrate;
       } else {
-        if (!(publisher = this.publishers[topic])) {
-          publisher = this.publishers[topic] = new Publisher(this, topic);
-        } else if (!forwards || typeof forwards !== 'function') {
-          publisher.active = true;
-          return;
-        }
-        subscriber = new Subscriber(publisher, forwards, backwards, context);
-        this.subscribers[subscriber.id] = subscriber;
-        publisher.subscribers.push(subscriber);
+        publisher = this._addPublisher(topic);
+        subscriber = this._addSubscriber(publisher, forwards, backwards, context);
       }
       if (migrate) {
         this._migrate(publisher, subscriber, migrate);
       }
-      return subscriber.id;
+      return subscriber;
     };
     PubSub.prototype._migrate = function(publisher, subscriber, type) {
       var message, messages, _i, _len;
@@ -122,38 +143,20 @@ var __slice = Array.prototype.slice;
       }
       return subscriber.id;
     };
-    PubSub.prototype.unsubscribe = function(topic, hard) {
-      var len, publisher, subscriber, subscribers, _i, _len, _ref, _results;
-      if (hard == null) {
-        hard = false;
+    PubSub.prototype.unsubscribe = function(subscriber, complete) {
+      if (complete == null) {
+        complete = false;
       }
-      if (typeof topic === 'number') {
-        subscriber = this.subscribers[topic];
-        if (hard) {
-          delete this.subscribers[topic];
-          subscribers = subscriber.publisher.subscribers;
-          len = subscribers.length;
-          _results = [];
-          while (len--) {
-            _results.push(subscriber.id === subscribers[len].id ? subscribers.splice(len, 1) : void 0);
-          }
-          return _results;
-        } else {
-          return subscriber.online = false;
+      if (!subscriber instanceof Subscriber) {
+        if (!(subscriber = this.subscribers[subscriber])) {
+          return;
         }
+      }
+      if (complete) {
+        delete this.subscribers[subscriber.id];
+        return subscriber.publisher._remove(subscriber);
       } else {
-        if ((publisher = this.publishers[topic])) {
-          if (hard) {
-            _ref = this.publishers[topic].subscribers;
-            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-              subscriber = _ref[_i];
-              delete this.subscribers[subscriber.id];
-            }
-            return delete this.publishers[topic];
-          } else {
-            return publisher.active = false;
-          }
-        }
+        return subscriber.online = false;
       }
     };
     PubSub.prototype.publish = function() {

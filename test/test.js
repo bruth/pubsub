@@ -14,38 +14,38 @@ test('Publish', 3, function() {
   return equals(output, 'and again', 'updated');
 });
 test('Subscribe', 3, function() {
-  var hub, output, sid;
+  var hub, output, sub;
   hub = new PubSub;
   output = null;
-  sid = hub.subscribe('foo', function(msg) {
+  sub = hub.subscribe('foo', function(msg) {
     return output = msg;
   });
   ok(hub.publishers.foo, 'a new topic has been added');
-  ok(hub.subscribers[sid], 'the subscriber has been added');
+  ok(hub.subscribers[sub.id], 'the subscriber has been added');
   return equals(output, null, 'nothing changed yet');
 });
 test('Subscribe - late', 6, function() {
-  var hub, output, p3, s1, s2, s3;
+  var hub, output, p3, sub1, sub2, sub3;
   hub = new PubSub;
   output = 0;
   hub.publish('foo');
   hub.publish('foo');
   p3 = hub.publish('foo');
-  s1 = hub.subscribe('foo', function() {
+  sub1 = hub.subscribe('foo', function() {
     return output++;
   });
   equals(output, 3, 'all history up to this point');
-  equals(hub.subscribers[s1].tip.id, p3, 'last pub is referenced');
-  s2 = hub.subscribe('foo', function() {
+  equals(sub1.tip.id, p3, 'last pub is referenced');
+  sub2 = hub.subscribe('foo', function() {
     return output++;
   }, null, null, 'tip');
   equals(output, 4, 'only the tip of the history was executed');
-  equals(hub.subscribers[s2].tip.id, p3, 'last pub is referenced');
-  s3 = hub.subscribe('foo', function() {
+  equals(sub2.tip.id, p3, 'last pub is referenced');
+  sub3 = hub.subscribe('foo', function() {
     return output++;
   }, null, null, false);
   equals(output, 4, 'none of the history is applied');
-  return equals(hub.subscribers[s3].tip, null, 'no pub has been applied');
+  return equals(sub3.tip, null, 'no pub has been applied');
 });
 test('Unsubscribe & Re-subscribe', 3, function() {
   var hub, output, s1;

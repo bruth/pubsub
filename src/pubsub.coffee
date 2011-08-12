@@ -58,6 +58,16 @@ do (window) ->
             @messages = []
             @active = true
 
+        _add: (subscriber) -> @subscribers.push subscriber
+
+        # Dereferences a subscriber from the local list
+        _remove: (subscriber) ->
+            len = @subscribers.length
+            while len--
+                if subscriber is @subscribers[len]
+                    @subscriber.pop len
+                    break
+
         tip: -> @messages[@messages.length - 1]
 
         # Purges a message given it's id.
@@ -82,6 +92,18 @@ do (window) ->
             @undos = []
             @redos = []
 
+        _addPublisher: (topic) ->
+            if not (publisher = @publishers[topic])
+                publisher = new Publisher @, topic
+                @publishers[topic] = publisher
+            return publisher
+
+        _addSubscriber: (publisher, forwards, backwards, context) ->
+            subscriber = new Subscriber publisher, forwards, backwards, context
+            @subscribers[subscriber.id] = subscriber
+            publisher._add subscriber
+            return subscriber
+
         # Subscribes a handler for the given publisher. For [idempotent][1]
         # subscribers, only the ``forwards`` handler is required. For
         # non-idempotent subscribers a ``backwards`` handler must also be
@@ -101,28 +123,18 @@ do (window) ->
         #
         # [1]: http://en.wikipedia.org/wiki/Idempotence
         subscribe: (topic, forwards, backwards, context, migrate=true) ->
-
-            if typeof topic is 'number'
-                if not (subscriber = @subscribers[topic]) then return
+            if topic instanceof Subscriber
+                subscriber = topic
                 subscriber.online = true
                 publisher = subscriber.publisher
-                publish = forwards or publish
+                migrate = forwards or migrate 
             else
-                if not (publisher = @publishers[topic])
-                    publisher = @publishers[topic] = new Publisher @, topic
-
-                else if not forwards or typeof forwards isnt 'function'
-                    publisher.active = true
-                    return
-
-                subscriber = new Subscriber publisher, forwards, backwards, context
-
-                @subscribers[subscriber.id] = subscriber
-                publisher.subscribers.push subscriber
+                publisher = @_addPublisher topic
+                subscriber = @_addSubscriber publisher, forwards, backwards, context
 
             if migrate then @_migrate publisher, subscriber, migrate
 
-            return subscriber.id
+            return subscriber
 
         _migrate: (publisher, subscriber, type) ->
             # Ensure this new subscriber does not go past the hub's current
@@ -150,30 +162,15 @@ do (window) ->
         # supplied or unsubscribe a subscriber via their ``id``. If ``remove``
         # is ``true``, all references to the unsubscribed object will be
         # deleted from this hub.
-        unsubscribe: (topic, hard=false) ->
+        unsubscribe: (subscriber, complete=false) ->
+            if not subscriber instanceof Subscriber
+                return if not (subscriber = @subscribers[subscriber])
 
-            if typeof topic is 'number'
-                subscriber = @subscribers[topic]
-                if hard
-                    delete @subscribers[topic]
-                    subscribers = subscriber.publisher.subscribers
-                    len = subscribers.length
-                    while len--
-                        if subscriber.id is subscribers[len].id
-                            subscribers.splice len, 1
-                else
-                    subscriber.online = false
-
-            # Handles unsubscribing a whole publisher, i.e. it will no longer
-            # broadcast or record new messages.
+            if complete
+                delete @subscribers[subscriber.id]
+                subscriber.publisher._remove subscriber
             else
-                if (publisher = @publishers[topic])
-                    if hard 
-                        for subscriber in @publishers[topic].subscribers
-                            delete @subscribers[subscriber.id]
-                        delete @publishers[topic]
-                    else
-                        publisher.active = false
+                subscriber.online = false
 
         # The workhorse of the ``publish`` method. For a publisher ``topic``, all
         # subscribers will their ``forwards`` handler be executed with ``args``
