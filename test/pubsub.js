@@ -15,7 +15,7 @@ var __slice = Array.prototype.slice;
       this.backwards = backwards;
       this.context = context;
       this.id = suid++;
-      this.active = true;
+      this.online = true;
       this.tip = null;
     }
     return Subscriber;
@@ -30,8 +30,8 @@ var __slice = Array.prototype.slice;
     return Message;
   })();
   Publisher = (function() {
-    function Publisher(name) {
-      this.name = name;
+    function Publisher(topic) {
+      this.topic = topic;
       this.subscribers = [];
       this.messages = [];
       this.active = true;
@@ -46,24 +46,24 @@ var __slice = Array.prototype.slice;
       this.subscribers = {};
       this.messages = {};
       this.tip = null;
-      this._undos = [];
-      this._redos = [];
+      this.undos = [];
+      this.redos = [];
     }
-    PubSub.prototype.subscribe = function(name, forwards, backwards, context, history) {
+    PubSub.prototype.subscribe = function(topic, forwards, backwards, context, history) {
       var message, messages, publish, publisher, subscriber, _i, _len;
       if (history == null) {
         history = 'full';
       }
-      if (typeof name === 'number') {
-        if (!(subscriber = this.subscribers[name])) {
+      if (typeof topic === 'number') {
+        if (!(subscriber = this.subscribers[topic])) {
           return;
         }
-        subscriber.active = true;
+        subscriber.online = true;
         publisher = subscriber.publisher;
         publish = forwards || publish;
       } else {
-        if (!(publisher = this.publishers[name])) {
-          publisher = this.publishers[name] = new Publisher(name);
+        if (!(publisher = this.publishers[topic])) {
+          publisher = this.publishers[topic] = new Publisher(topic);
         } else if (!forwards || typeof forwards !== 'function') {
           publisher.active = true;
           return;
@@ -97,15 +97,15 @@ var __slice = Array.prototype.slice;
       }
       return subscriber.id;
     };
-    PubSub.prototype.unsubscribe = function(name, hard) {
+    PubSub.prototype.unsubscribe = function(topic, hard) {
       var len, publisher, subscriber, subscribers, _i, _len, _ref, _results;
       if (hard == null) {
         hard = false;
       }
-      if (typeof name === 'number') {
-        subscriber = this.subscribers[name];
+      if (typeof topic === 'number') {
+        subscriber = this.subscribers[topic];
         if (hard) {
-          delete this.subscribers[name];
+          delete this.subscribers[topic];
           subscribers = subscriber.publisher.subscribers;
           len = subscribers.length;
           _results = [];
@@ -114,17 +114,17 @@ var __slice = Array.prototype.slice;
           }
           return _results;
         } else {
-          return subscriber.active = false;
+          return subscriber.online = false;
         }
       } else {
-        if ((publisher = this.publishers[name])) {
+        if ((publisher = this.publishers[topic])) {
           if (hard) {
-            _ref = this.publishers[name].subscribers;
+            _ref = this.publishers[topic].subscribers;
             for (_i = 0, _len = _ref.length; _i < _len; _i++) {
               subscriber = _ref[_i];
               delete this.subscribers[subscriber.id];
             }
-            return delete this.publishers[name];
+            return delete this.publishers[topic];
           } else {
             return publisher.active = false;
           }
@@ -132,10 +132,10 @@ var __slice = Array.prototype.slice;
       }
     };
     PubSub.prototype.publish = function() {
-      var args, message, name, publisher, subscriber, _i, _len, _ref;
-      name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      if (!(publisher = this.publishers[name])) {
-        publisher = this.publishers[name] = new Publisher(name);
+      var args, message, publisher, subscriber, topic, _i, _len, _ref;
+      topic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      if (!(publisher = this.publishers[topic])) {
+        publisher = this.publishers[topic] = new Publisher(topic);
       } else if (!publisher.active) {
         return;
       }
@@ -148,7 +148,7 @@ var __slice = Array.prototype.slice;
         _ref = publisher.subscribers;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           subscriber = _ref[_i];
-          if (!subscriber.active) {
+          if (!subscriber.online) {
             continue;
           }
           this._transaction(subscriber, message, args.slice(0));
@@ -158,8 +158,8 @@ var __slice = Array.prototype.slice;
     };
     PubSub.prototype.undo = function() {
       var message;
-      if ((message = this._undos.pop())) {
-        this._redos.push(message);
+      if ((message = this.undos.pop())) {
+        this.redos.push(message);
         if (!message.publisher.active) {
           return this.undo();
         } else {
@@ -169,8 +169,8 @@ var __slice = Array.prototype.slice;
     };
     PubSub.prototype.redo = function() {
       var message;
-      if ((message = this._redos.pop())) {
-        this._undos.push(message);
+      if ((message = this.redos.pop())) {
+        this.undos.push(message);
         if (!message.publisher.active) {
           return this.redo();
         } else {
@@ -200,7 +200,7 @@ var __slice = Array.prototype.slice;
         _ref = publisher.subscribers;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           subscriber = _ref[_i];
-          if (!subscriber.active) {
+          if (!subscriber.online) {
             continue;
           }
           try {
@@ -219,7 +219,7 @@ var __slice = Array.prototype.slice;
         _ref = publisher.subscribers;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           subscriber = _ref[_i];
-          if (!subscriber.active) {
+          if (!subscriber.online) {
             continue;
           }
           try {
@@ -241,11 +241,11 @@ var __slice = Array.prototype.slice;
     };
     PubSub.prototype._flush = function() {
       var message, _, _i, _len, _ref, _results;
-      _ref = this._redos;
+      _ref = this.redos;
       _results = [];
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         _ = _ref[_i];
-        message = this._redos.shift();
+        message = this.redos.shift();
         message.publisher.messages.pop();
         _results.push(delete this.messages[message.id]);
       }
@@ -256,10 +256,10 @@ var __slice = Array.prototype.slice;
       message = new Message(publisher, args, publisher.messages.last());
       this.messages[message.id] = message;
       publisher.messages.push(message);
-      if (this.undoStackSize && this._undos.length === this.undoStackSize) {
-        this._undos.shift();
+      if (this.undoStackSize && this.undos.length === this.undoStackSize) {
+        this.undos.shift();
       }
-      this._undos.push(message);
+      this.undos.push(message);
       return this.tip = message;
     };
     return PubSub;

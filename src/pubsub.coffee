@@ -28,7 +28,7 @@ do (window) ->
     class Subscriber
         constructor: (@publisher, @forwards, @backwards, @context) ->
             @id = suid++
-            @active = true
+            @online = true
             @tip = null
 
     # Message
@@ -47,7 +47,7 @@ do (window) ->
     # be deactivated. During this time, no messages will be queued nor
     # broadcasted to it's subscribers.
     class Publisher
-        constructor: (@name) ->
+        constructor: (@topic) ->
             @subscribers = []
             @messages = []
             @active = true
@@ -63,8 +63,9 @@ do (window) ->
             @subscribers = {}
             @messages = {}
             @tip = null
-            @_undos = []
-            @_redos = []
+            @undos = []
+            @redos = []
+
 
         # Subscribes a handler for the given publisher. For [idempotent][1]
         # subscribers, only the ``forwards`` handler is required. For
@@ -82,20 +83,20 @@ do (window) ->
         # A subscriber ID can be passed in to _resume_ a previous subscription.
         # If this method is used, a second parameter can be supplied to
         # specify whether the subscriber should apply this publisher's publish
-        # messages. If a publisher ``name`` is passed in without a ``forwards``
+        # messages. If a publisher ``topic`` is passed in without a ``forwards``
         # handler, the publisher will be re-activated.
         #
         # [1]: http://en.wikipedia.org/wiki/Idempotence
-        subscribe: (name, forwards, backwards, context, history='full') ->
+        subscribe: (topic, forwards, backwards, context, history='full') ->
 
-            if typeof name is 'number'
-                if not (subscriber = @subscribers[name]) then return
-                subscriber.active = true
+            if typeof topic is 'number'
+                if not (subscriber = @subscribers[topic]) then return
+                subscriber.online = true
                 publisher = subscriber.publisher
                 publish = forwards or publish
             else
-                if not (publisher = @publishers[name])
-                    publisher = @publishers[name] = new Publisher name
+                if not (publisher = @publishers[topic])
+                    publisher = @publishers[topic] = new Publisher topic
 
                 else if not forwards or typeof forwards isnt 'function'
                     publisher.active = true
@@ -129,45 +130,45 @@ do (window) ->
             # return the subscriber id for later reference in the application
             return subscriber.id
 
-        # Unsubscribe all subscribers for a given ``publisher`` is a publisher name is
+        # Unsubscribe all subscribers for a given ``publisher`` is a publisher topic is
         # supplied or unsubscribe a subscriber via their ``id``. If ``remove``
         # is ``true``, all references to the unsubscribed object will be
         # deleted from this hub.
-        unsubscribe: (name, hard=false) ->
+        unsubscribe: (topic, hard=false) ->
 
-            if typeof name is 'number'
-                subscriber = @subscribers[name]
+            if typeof topic is 'number'
+                subscriber = @subscribers[topic]
                 if hard
-                    delete @subscribers[name]
+                    delete @subscribers[topic]
                     subscribers = subscriber.publisher.subscribers
                     len = subscribers.length
                     while len--
                         if subscriber.id is subscribers[len].id
                             subscribers.splice len, 1
                 else
-                    subscriber.active = false
+                    subscriber.online = false
 
             # Handles unsubscribing a whole publisher, i.e. it will no longer
             # broadcast or record new messages.
             else
-                if (publisher = @publishers[name])
+                if (publisher = @publishers[topic])
                     if hard 
-                        for subscriber in @publishers[name].subscribers
+                        for subscriber in @publishers[topic].subscribers
                             delete @subscribers[subscriber.id]
-                        delete @publishers[name]
+                        delete @publishers[topic]
                     else
                         publisher.active = false
 
-        # The workhorse of the ``publish`` method. For a publisher ``name``, all
+        # The workhorse of the ``publish`` method. For a publisher ``topic``, all
         # subscribers will their ``forwards`` handler be executed with ``args``
         # being passed in.
         #
         # Currently, only top-level messages are recorded. If the hub's
         # ``locked`` flag is ``true``, no message is recorded.
-        publish: (name, args...) ->
+        publish: (topic, args...) ->
 
-            if not (publisher = @publishers[name])
-                publisher = @publishers[name] = new Publisher name
+            if not (publisher = @publishers[topic])
+                publisher = @publishers[topic] = new Publisher topic
             else if not publisher.active
                 return
 
@@ -187,7 +188,7 @@ do (window) ->
             if publisher.subscribers.length
                 for subscriber in publisher.subscribers
                     # Skip temporarily unsubscribed subscribers
-                    if not subscriber.active then continue
+                    if not subscriber.online then continue
                     # Create copies of ``args`` to ensure no side-effects
                     # between subscribers.
                     @_transaction subscriber, message, args.slice(0)
@@ -198,8 +199,8 @@ do (window) ->
         # which have an unsubscribed publisher.
         undo: ->
 
-            if (message = @_undos.pop())
-                @_redos.push message
+            if (message = @undos.pop())
+                @redos.push message
                 if not message.publisher.active
                     @undo()
                 else
@@ -209,8 +210,8 @@ do (window) ->
         # which have an unsubscribed publisher.
         redo: ->
 
-            if (message = @_redos.pop())
-                @_undos.push message
+            if (message = @redos.pop())
+                @undos.push message
                 if not message.publisher.active
                     @redo()
                 else
@@ -234,7 +235,7 @@ do (window) ->
             else
                 try subscriber.forwards.apply subscriber.context, args
 
-        # The logic behind the ``redo`` operation. Each active subscriber for
+        # The logic behind the ``redo`` operation. Each online subscriber for
         # the ``message``'s publisher is targeted.
         #
         # Errors must be caught here to ensure other subscribers are not
@@ -244,7 +245,7 @@ do (window) ->
             publisher = message.publisher
             if publisher.subscribers.length
                 for subscriber in publisher.subscribers
-                    if not subscriber.active then continue
+                    if not subscriber.online then continue
                     try
                         subscriber.forwards.apply subscriber.context, message.args.slice(0)
                     finally
@@ -252,7 +253,7 @@ do (window) ->
 
             @tip = message
 
-        # The logic behind the ``undo`` operation. Each active subscriber for
+        # The logic behind the ``undo`` operation. Each online subscriber for
         # the ``message``'s publisher is targeted. If the ``backwards`` handler is not
         # defined, the ``forwards`` handler will be used with the previous
         # message's ``args`` for the publisher to mimic the last state.
@@ -264,7 +265,7 @@ do (window) ->
             publisher = message.publisher
             if publisher.subscribers.length
                 for subscriber in publisher.subscribers
-                    if not subscriber.active then continue
+                    if not subscriber.online then continue
 
                     try
                         if not subscriber.backwards
@@ -279,11 +280,11 @@ do (window) ->
 
             @tip = message
 
-        # Takes each message in the ``_redos`` and removes and  deferences them
+        # Takes each message in the ``redos`` and removes and  deferences them
         # from the respective ``publisher`` and the hub.
         _flush: ->
-            for _ in @_redos
-                message = @_redos.shift()
+            for _ in @redos
+                message = @redos.shift()
                 message.publisher.messages.pop()
                 delete @messages[message.id]
 
@@ -301,9 +302,9 @@ do (window) ->
             @messages[message.id] = message
             publisher.messages.push message
 
-            if @undoStackSize and @_undos.length is @undoStackSize
-                @_undos.shift()
-            @_undos.push message
+            if @undoStackSize and @undos.length is @undoStackSize
+                @undos.shift()
+            @undos.push message
 
             @tip = message
 
