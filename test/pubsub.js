@@ -6,39 +6,41 @@ var __slice = Array.prototype.slice;
       return this[this.length - 1];
     };
   }
-  muid = 1;
   suid = 1;
-  Subscriber = function(publisher, forwards, backwards, context) {
-    this.id = suid++;
-    this.publisher = publisher;
-    this.forwards = forwards;
-    this.backwards = backwards;
-    this.context = context || this;
-    this.active = true;
-    this.tip = null;
-    return this;
-  };
-  Message = function(publisher, args, previous) {
-    this.id = muid++;
-    this.publisher = publisher;
-    this.args = args;
-    this.previous = previous;
-    return this;
-  };
-  Publisher = function(name) {
-    this.name = name;
-    this.subscribers = [];
-    this.messages = [];
-    this.active = true;
-    return this;
-  };
-  PubSub = function(undoStackSize) {
-    return new PubSub.fn.init(undoStackSize);
-  };
-  PubSub.version = '0.2';
-  PubSub.fn = PubSub.prototype = {
-    constructor: PubSub,
-    init: function(undoStackSize) {
+  muid = 1;
+  Subscriber = (function() {
+    function Subscriber(publisher, forwards, backwards, context) {
+      this.publisher = publisher;
+      this.forwards = forwards;
+      this.backwards = backwards;
+      this.context = context;
+      this.id = suid++;
+      this.active = true;
+      this.tip = null;
+    }
+    return Subscriber;
+  })();
+  Message = (function() {
+    function Message(publisher, args, previous) {
+      this.publisher = publisher;
+      this.args = args;
+      this.previous = previous;
+      this.id = muid++;
+    }
+    return Message;
+  })();
+  Publisher = (function() {
+    function Publisher(name) {
+      this.name = name;
+      this.subscribers = [];
+      this.messages = [];
+      this.active = true;
+    }
+    return Publisher;
+  })();
+  PubSub = (function() {
+    PubSub.prototype.version = '0.2.1';
+    function PubSub(undoStackSize) {
       this.undoStackSize = undoStackSize;
       this.publishers = {};
       this.subscribers = {};
@@ -46,9 +48,8 @@ var __slice = Array.prototype.slice;
       this.tip = null;
       this._undos = [];
       this._redos = [];
-      return this;
-    },
-    subscribe: function(name, forwards, backwards, context, history) {
+    }
+    PubSub.prototype.subscribe = function(name, forwards, backwards, context, history) {
       var message, messages, publish, publisher, subscriber, _i, _len;
       if (history == null) {
         history = 'full';
@@ -95,8 +96,8 @@ var __slice = Array.prototype.slice;
         subscriber.tip = message;
       }
       return subscriber.id;
-    },
-    unsubscribe: function(name, hard) {
+    };
+    PubSub.prototype.unsubscribe = function(name, hard) {
       var len, publisher, subscriber, subscribers, _i, _len, _ref, _results;
       if (hard == null) {
         hard = false;
@@ -129,8 +130,8 @@ var __slice = Array.prototype.slice;
           }
         }
       }
-    },
-    publish: function() {
+    };
+    PubSub.prototype.publish = function() {
       var args, message, name, publisher, subscriber, _i, _len, _ref;
       name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       if (!(publisher = this.publishers[name])) {
@@ -154,8 +155,8 @@ var __slice = Array.prototype.slice;
         }
       }
       return message && message.id;
-    },
-    undo: function() {
+    };
+    PubSub.prototype.undo = function() {
       var message;
       if ((message = this._undos.pop())) {
         this._redos.push(message);
@@ -165,8 +166,8 @@ var __slice = Array.prototype.slice;
           return this._backwards(message);
         }
       }
-    },
-    redo: function() {
+    };
+    PubSub.prototype.redo = function() {
       var message;
       if ((message = this._redos.pop())) {
         this._undos.push(message);
@@ -176,8 +177,8 @@ var __slice = Array.prototype.slice;
           return this._forwards(message);
         }
       }
-    },
-    _transaction: function(subscriber, message, args) {
+    };
+    PubSub.prototype._transaction = function(subscriber, message, args) {
       if (!this.locked) {
         this.locked = true;
         try {
@@ -191,8 +192,8 @@ var __slice = Array.prototype.slice;
           return subscriber.forwards.apply(subscriber.context, args);
         } catch (_e) {}
       }
-    },
-    _forwards: function(message) {
+    };
+    PubSub.prototype._forwards = function(message) {
       var publisher, subscriber, _i, _len, _ref;
       publisher = message.publisher;
       if (publisher.subscribers.length) {
@@ -210,8 +211,8 @@ var __slice = Array.prototype.slice;
         }
       }
       return this.tip = message;
-    },
-    _backwards: function(message) {
+    };
+    PubSub.prototype._backwards = function(message) {
       var publisher, subscriber, _i, _len, _ref;
       publisher = message.publisher;
       if (publisher.subscribers.length) {
@@ -237,8 +238,8 @@ var __slice = Array.prototype.slice;
         }
       }
       return this.tip = message;
-    },
-    _flush: function() {
+    };
+    PubSub.prototype._flush = function() {
       var message, _, _i, _len, _ref, _results;
       _ref = this._redos;
       _results = [];
@@ -249,8 +250,8 @@ var __slice = Array.prototype.slice;
         _results.push(delete this.messages[message.id]);
       }
       return _results;
-    },
-    _record: function(publisher, args) {
+    };
+    PubSub.prototype._record = function(publisher, args) {
       var message;
       message = new Message(publisher, args, publisher.messages.last());
       this.messages[message.id] = message;
@@ -260,8 +261,8 @@ var __slice = Array.prototype.slice;
       }
       this._undos.push(message);
       return this.tip = message;
-    }
-  };
-  PubSub.fn.init.prototype = PubSub.fn;
+    };
+    return PubSub;
+  })();
   return window.PubSub = PubSub;
 })(window);

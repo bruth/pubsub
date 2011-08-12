@@ -8,68 +8,63 @@
 do (window) ->
 
     # Add helper function to Array
-    if not Array::last then Array::last = -> @[this.length - 1]
+    if not Array::last then Array::last = -> @[@length - 1]
 
-    # Internal unique identifiers for messages and subscribers
-    muid = 1
+    # Internal unique identifiers for messages and subscribers global to the
+    # PubSub constructor. This ensures cross hub references never clash.
     suid = 1
+    muid = 1
 
     # Subscriber
     # ----------
-    # Simple constructor to encapsulate a subscriber
-    Subscriber = (publisher, forwards, backwards, context) ->
-        @id = suid++
-        @publisher = publisher
-        @forwards = forwards
-        @backwards = backwards
-        @context = context or @
-        @active = true
-        @tip = null
-        @
+    # A subscriber is composed of a ``forwards`` handler and optionally a
+    # ``backwards`` handler for supporting the PubSub history API. An optional
+    # ``context`` can also be supplied to be the context for the handlers.
+    #
+    # ``tip`` represents the last message this subscriber has received. A
+    # subscriber can be deactivated at any time to prevent (or suspend) future
+    # messages from being received. On re-activation, it can optionally receive
+    # the queued up messages since it was last subscribed.
+    class Subscriber
+        constructor: (@publisher, @forwards, @backwards, @context) ->
+            @id = suid++
+            @active = true
+            @tip = null
 
     # Message
     # -------
-    # Simple constructor to encapsulate a top-level publishing
-    Message = (publisher, args, previous) ->
-        @id = muid++
-        @publisher = publisher
-        @args = args
-        @previous = previous
-        @
+    # A message is created and sent by it's ``publisher``. A message is
+    # composed simply of arguments that will be passed into the subscriber's
+    # handlers.
+    class Message
+        constructor: (@publisher, @args, @previous) ->
+            @id = muid++
 
     # Publisher
     # ---------
-    # Simple constructor to encapsulate a single publisher. all ``subscribers``
-    # and messages ``messages`` references for this publisher are stored here.
-    Publisher = (name) ->
-        @name = name
-        @subscribers = []
-        @messages = []
-        @active = true
-        @
+    # Messages are send via a publisher whom broadcasts them to it's
+    # subscribers. Similarly to a subscriber, a publisher can also
+    # be deactivated. During this time, no messages will be queued nor
+    # broadcasted to it's subscribers.
+    class Publisher
+        constructor: (@name) ->
+            @subscribers = []
+            @messages = []
+            @active = true
 
-    PubSub = (undoStackSize) ->
-        new PubSub.fn.init(undoStackSize)
-
-    PubSub.version = '@VERSION'
-
-    PubSub.fn = PubSub:: =
-
-        constructor: PubSub
+    class PubSub
+        version: '@VERSION'
 
         # The ``PubSub`` constructor takes a single optional argument
         # ``undoStackSize`` which specifies a limit to the undo stack size. If
         # it reaches the limit, the oldest undo will be shifted off
-        init: (undoStackSize) ->
-            @undoStackSize = undoStackSize
-
+        constructor: (@undoStackSize) ->
             @publishers = {}
             @subscribers = {}
             @messages = {}
             @tip = null
             @_undos = []
             @_redos = []
-            @
 
         # Subscribes a handler for the given publisher. For [idempotent][1]
         # subscribers, only the ``forwards`` handler is required. For
@@ -312,7 +307,5 @@ do (window) ->
 
             @tip = message
 
-
-    PubSub.fn.init:: = PubSub.fn
 
     window.PubSub = PubSub
