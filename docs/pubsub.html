@@ -22,8 +22,11 @@ the queued up messages since it was last subscribed.</p>             </td>      
 <p>A message is created and sent by it's <code>publisher</code>. A message is
 composed simply of arguments that will be passed into the subscriber's
 handlers.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">class</span> <span class="nx">Message</span>
-        <span class="nv">constructor: </span><span class="nf">(@publisher, @args, @previous) -&gt;</span>
-            <span class="vi">@id = </span><span class="nx">muid</span><span class="o">++</span></pre></div>             </td>           </tr>                               <tr id="section-5">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-5">&#182;</a>               </div>               <h2>Publisher</h2>
+        <span class="nv">constructor: </span><span class="nf">(@publisher, @content) -&gt;</span>
+            <span class="vi">@id = </span><span class="nx">muid</span><span class="o">++</span>
+            <span class="vi">@previous = </span><span class="nx">@publisher</span><span class="p">.</span><span class="nx">tip</span><span class="p">()</span>
+
+        <span class="nv">copy: </span><span class="o">-&gt;</span> <span class="nx">@content</span><span class="p">.</span><span class="nx">slice</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-5">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-5">&#182;</a>               </div>               <h2>Publisher</h2>
 
 <p>Messages are send via a publisher whom broadcasts them to it's
 subscribers. Similarly to a subscriber, a publisher can also
@@ -95,7 +98,7 @@ state and does not respond to a former message.</p>             </td>           
                         <span class="k">break</span>
                     <span class="k">if</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">tip</span> <span class="o">and</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">tip</span><span class="p">.</span><span class="nx">id</span> <span class="o">&gt;=</span> <span class="nx">message</span><span class="p">.</span><span class="nx">id</span>
                         <span class="k">continue</span>
-                    <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">args</span>
+                    <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">copy</span><span class="p">()</span>
 
                 <span class="nv">subscriber.tip = </span><span class="nx">message</span></pre></div>             </td>           </tr>                               <tr id="section-9">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-9">&#182;</a>               </div>               <p>return the subscriber id for later reference in the application</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">return</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">id</span></pre></div>             </td>           </tr>                               <tr id="section-10">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-10">&#182;</a>               </div>               <p>Unsubscribe all subscribers for a given <code>publisher</code> is a publisher topic is
 supplied or unsubscribe a subscriber via their <code>id</code>. If <code>remove</code>
@@ -181,14 +184,14 @@ affected downstream.</p>             </td>             <td class="code">        
                 <span class="k">for</span> <span class="nx">subscriber</span> <span class="k">in</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span>
                     <span class="k">if</span> <span class="o">not</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">online</span> <span class="k">then</span> <span class="k">continue</span>
                     <span class="k">try</span>
-                        <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                        <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">copy</span><span class="p">()</span>
                     <span class="k">finally</span>
                         <span class="nv">subscriber.tip = </span><span class="nx">message</span>
 
             <span class="vi">@tip = </span><span class="nx">message</span></pre></div>             </td>           </tr>                               <tr id="section-23">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-23">&#182;</a>               </div>               <p>The logic behind the <code>undo</code> operation. Each online subscriber for
 the <code>message</code>'s publisher is targeted. If the <code>backwards</code> handler is not
 defined, the <code>forwards</code> handler will be used with the previous
-message's <code>args</code> for the publisher to mimic the last state.</p>
+message's <code>content</code> for the publisher to mimic the last state.</p>
 
 <p>Errors must be caught here to ensure other subscribers are not
 affected downstream.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_backwards: </span><span class="nf">(message) -&gt;</span>
@@ -201,11 +204,11 @@ affected downstream.</p>             </td>             <td class="code">        
                     <span class="k">try</span>
                         <span class="k">if</span> <span class="o">not</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">backwards</span>
                             <span class="k">if</span> <span class="nx">message</span><span class="p">.</span><span class="nx">previous</span>
-                                <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">previous</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                                <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">previous</span><span class="p">.</span><span class="nx">copy</span><span class="p">()</span>
                             <span class="k">else</span>
                                 <span class="nx">subscriber</span><span class="p">.</span><span class="nx">forwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span>
                         <span class="k">else</span>
-                            <span class="nx">subscriber</span><span class="p">.</span><span class="nx">backwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">args</span><span class="p">.</span><span class="nx">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                            <span class="nx">subscriber</span><span class="p">.</span><span class="nx">backwards</span><span class="p">.</span><span class="nx">apply</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">context</span><span class="p">,</span> <span class="nx">message</span><span class="p">.</span><span class="nx">copy</span><span class="p">()</span>
                     <span class="k">finally</span>
                         <span class="nv">subscriber.tip = </span><span class="nx">message</span>
 
@@ -223,7 +226,7 @@ is set as the hub's <code>tip</code> message.</p>
 
 <p>If <code>undoStackSize</code> has been defined, the oldest undo will be shifted off the
 front of the stack.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">_record: </span><span class="nf">(publisher, args) -&gt;</span>
-            <span class="nv">message = </span><span class="k">new</span> <span class="nx">Message</span> <span class="nx">publisher</span><span class="p">,</span> <span class="nx">args</span><span class="p">,</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">tip</span><span class="p">()</span>
+            <span class="nv">message = </span><span class="k">new</span> <span class="nx">Message</span> <span class="nx">publisher</span><span class="p">,</span> <span class="nx">args</span>
             <span class="nx">@messages</span><span class="p">[</span><span class="nx">message</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span> <span class="o">=</span> <span class="nx">message</span>
             <span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span><span class="p">.</span><span class="nx">push</span> <span class="nx">message</span>
 

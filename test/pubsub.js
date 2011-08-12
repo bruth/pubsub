@@ -16,12 +16,15 @@ var __slice = Array.prototype.slice;
     return Subscriber;
   })();
   Message = (function() {
-    function Message(publisher, args, previous) {
+    function Message(publisher, content) {
       this.publisher = publisher;
-      this.args = args;
-      this.previous = previous;
+      this.content = content;
       this.id = muid++;
+      this.previous = this.publisher.tip();
     }
+    Message.prototype.copy = function() {
+      return this.content.slice();
+    };
     return Message;
   })();
   Publisher = (function() {
@@ -89,7 +92,7 @@ var __slice = Array.prototype.slice;
           if (subscriber.tip && subscriber.tip.id >= message.id) {
             continue;
           }
-          subscriber.forwards.apply(subscriber.context, message.args);
+          subscriber.forwards.apply(subscriber.context, message.copy());
         }
         subscriber.tip = message;
       }
@@ -202,7 +205,7 @@ var __slice = Array.prototype.slice;
             continue;
           }
           try {
-            subscriber.forwards.apply(subscriber.context, message.args.slice(0));
+            subscriber.forwards.apply(subscriber.context, message.copy());
           } finally {
             subscriber.tip = message;
           }
@@ -223,12 +226,12 @@ var __slice = Array.prototype.slice;
           try {
             if (!subscriber.backwards) {
               if (message.previous) {
-                subscriber.forwards.apply(subscriber.context, message.previous.args.slice(0));
+                subscriber.forwards.apply(subscriber.context, message.previous.copy());
               } else {
                 subscriber.forwards.apply(subscriber.context);
               }
             } else {
-              subscriber.backwards.apply(subscriber.context, message.args.slice(0));
+              subscriber.backwards.apply(subscriber.context, message.copy());
             }
           } finally {
             subscriber.tip = message;
@@ -251,7 +254,7 @@ var __slice = Array.prototype.slice;
     };
     PubSub.prototype._record = function(publisher, args) {
       var message;
-      message = new Message(publisher, args, publisher.tip());
+      message = new Message(publisher, args);
       this.messages[message.id] = message;
       publisher.messages.push(message);
       if (this.undoStackSize && this.undos.length === this.undoStackSize) {

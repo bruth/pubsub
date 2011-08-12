@@ -34,8 +34,11 @@ do (window) ->
     # composed simply of arguments that will be passed into the subscriber's
     # handlers.
     class Message
-        constructor: (@publisher, @args, @previous) ->
+        constructor: (@publisher, @content) ->
             @id = muid++
+            @previous = @publisher.tip()
+
+        copy: -> @content.slice()
 
     # Publisher
     # ---------
@@ -122,7 +125,7 @@ do (window) ->
                         break
                     if subscriber.tip and subscriber.tip.id >= message.id
                         continue
-                    subscriber.forwards.apply subscriber.context, message.args
+                    subscriber.forwards.apply subscriber.context, message.copy()
 
                 subscriber.tip = message
 
@@ -246,7 +249,7 @@ do (window) ->
                 for subscriber in publisher.subscribers
                     if not subscriber.online then continue
                     try
-                        subscriber.forwards.apply subscriber.context, message.args.slice(0)
+                        subscriber.forwards.apply subscriber.context, message.copy()
                     finally
                         subscriber.tip = message
 
@@ -255,7 +258,7 @@ do (window) ->
         # The logic behind the ``undo`` operation. Each online subscriber for
         # the ``message``'s publisher is targeted. If the ``backwards`` handler is not
         # defined, the ``forwards`` handler will be used with the previous
-        # message's ``args`` for the publisher to mimic the last state.
+        # message's ``content`` for the publisher to mimic the last state.
         #
         # Errors must be caught here to ensure other subscribers are not
         # affected downstream.
@@ -269,11 +272,11 @@ do (window) ->
                     try
                         if not subscriber.backwards
                             if message.previous
-                                subscriber.forwards.apply subscriber.context, message.previous.args.slice(0)
+                                subscriber.forwards.apply subscriber.context, message.previous.copy()
                             else
                                 subscriber.forwards.apply subscriber.context
                         else
-                            subscriber.backwards.apply subscriber.context, message.args.slice(0)
+                            subscriber.backwards.apply subscriber.context, message.copy()
                     finally
                         subscriber.tip = message
 
@@ -297,7 +300,7 @@ do (window) ->
         # If ``undoStackSize`` has been defined, the oldest undo will be shifted off the
         # front of the stack.
         _record: (publisher, args) ->
-            message = new Message publisher, args, publisher.tip()
+            message = new Message publisher, args
             @messages[message.id] = message
             publisher.messages.push message
 
