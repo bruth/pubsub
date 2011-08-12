@@ -12,6 +12,7 @@ var __slice = Array.prototype.slice;
       this.id = suid++;
       this.online = true;
       this.tip = null;
+      this.hub = this.publisher.hub;
     }
     return Subscriber;
   })();
@@ -21,14 +22,21 @@ var __slice = Array.prototype.slice;
       this.content = content;
       this.id = muid++;
       this.previous = this.publisher.tip();
+      this.publisher.messages.push(this);
+      this.hub = this.publisher.hub;
+      this.hub.messages[this.id] = this;
     }
     Message.prototype.copy = function() {
       return this.content.slice();
     };
+    Message.prototype.available = function() {
+      return this.publisher.active;
+    };
     return Message;
   })();
   Publisher = (function() {
-    function Publisher(topic) {
+    function Publisher(hub, topic) {
+      this.hub = hub;
       this.topic = topic;
       this.subscribers = [];
       this.messages = [];
@@ -36,6 +44,18 @@ var __slice = Array.prototype.slice;
     }
     Publisher.prototype.tip = function() {
       return this.messages[this.messages.length - 1];
+    };
+    Publisher.prototype.purge = function(message) {
+      var len, _results;
+      len = this.messages.length;
+      _results = [];
+      while (len--) {
+        if (message === this.messages[len]) {
+          this.messages.pop(len);
+          break;
+        }
+      }
+      return _results;
     };
     return Publisher;
   })();
@@ -64,7 +84,7 @@ var __slice = Array.prototype.slice;
         publish = forwards || publish;
       } else {
         if (!(publisher = this.publishers[topic])) {
-          publisher = this.publishers[topic] = new Publisher(topic);
+          publisher = this.publishers[topic] = new Publisher(this, topic);
         } else if (!forwards || typeof forwards !== 'function') {
           publisher.active = true;
           return;
@@ -140,13 +160,12 @@ var __slice = Array.prototype.slice;
       var args, message, publisher, subscriber, topic, _i, _len, _ref;
       topic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       if (!(publisher = this.publishers[topic])) {
-        publisher = this.publishers[topic] = new Publisher(topic);
+        publisher = this.publishers[topic] = new Publisher(this, topic);
       } else if (!publisher.active) {
         return;
       }
       message = null;
       if (!this.locked) {
-        this._flush();
         message = this._record(publisher, args);
       }
       if (publisher.subscribers.length) {
@@ -165,10 +184,10 @@ var __slice = Array.prototype.slice;
       var message;
       if ((message = this.undos.pop())) {
         this.redos.push(message);
-        if (!message.publisher.active) {
-          return this.undo();
-        } else {
+        if (message.available()) {
           return this._backwards(message);
+        } else {
+          return this.undo();
         }
       }
     };
@@ -176,10 +195,10 @@ var __slice = Array.prototype.slice;
       var message;
       if ((message = this.redos.pop())) {
         this.undos.push(message);
-        if (!message.publisher.active) {
-          return this.redo();
-        } else {
+        if (message.available()) {
           return this._forwards(message);
+        } else {
+          return this.redo();
         }
       }
     };
@@ -245,27 +264,34 @@ var __slice = Array.prototype.slice;
       return this.tip = message;
     };
     PubSub.prototype._flush = function() {
-      var message, _, _i, _len, _ref, _results;
-      _ref = this.redos;
+      var len, message, _results;
+      len = this.redos.length;
       _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        _ = _ref[_i];
+      while (len--) {
         message = this.redos.shift();
-        message.publisher.messages.pop();
-        _results.push(delete this.messages[message.id]);
+        _results.push(this._purge(message));
       }
       return _results;
     };
+    PubSub.prototype._prune = function() {
+      var message;
+      if (this.undoStackSize && this.undos.length === this.undoStackSize) {
+        message = this.undos.shift();
+        return this._purge(message);
+      }
+    };
+    PubSub.prototype._purge = function(message) {
+      message.publisher.purge(message);
+      return delete this.messages[message.id];
+    };
     PubSub.prototype._record = function(publisher, args) {
       var message;
+      this._flush();
       message = new Message(publisher, args);
-      this.messages[message.id] = message;
-      publisher.messages.push(message);
-      if (this.undoStackSize && this.undos.length === this.undoStackSize) {
-        this.undos.shift();
-      }
+      this._prune();
       this.undos.push(message);
-      return this.tip = message;
+      this.tip = message;
+      return message;
     };
     return PubSub;
   })();

@@ -27,6 +27,7 @@ do (window) ->
             @id = suid++
             @online = true
             @tip = null
+            @hub = @publisher.hub
 
     # Message
     # -------
@@ -37,8 +38,13 @@ do (window) ->
         constructor: (@publisher, @content) ->
             @id = muid++
             @previous = @publisher.tip()
+            @publisher.messages.push @ 
+            @hub = @publisher.hub
+            @hub.messages[@id] = @
 
         copy: -> @content.slice()
+
+        available: -> @publisher.active
 
     # Publisher
     # ---------
@@ -47,12 +53,20 @@ do (window) ->
     # be deactivated. During this time, no messages will be queued nor
     # broadcasted to it's subscribers.
     class Publisher
-        constructor: (@topic) ->
+        constructor: (@hub, @topic) ->
             @subscribers = []
             @messages = []
             @active = true
 
         tip: -> @messages[@messages.length - 1]
+
+        # Purges a message given it's id.
+        purge: (message) ->
+            len = @messages.length
+            while len--
+                if message is @messages[len]
+                    @messages.pop len
+                    break
 
     class PubSub
         version: '@VERSION'
@@ -95,7 +109,7 @@ do (window) ->
                 publish = forwards or publish
             else
                 if not (publisher = @publishers[topic])
-                    publisher = @publishers[topic] = new Publisher topic
+                    publisher = @publishers[topic] = new Publisher @, topic
 
                 else if not forwards or typeof forwards isnt 'function'
                     publisher.active = true
@@ -170,7 +184,7 @@ do (window) ->
         publish: (topic, args...) ->
 
             if not (publisher = @publishers[topic])
-                publisher = @publishers[topic] = new Publisher topic
+                publisher = @publishers[topic] = new Publisher @, topic
             else if not publisher.active
                 return
 
@@ -178,10 +192,7 @@ do (window) ->
 
             # A message will only be recorded when it's a top-level call.
             # This ensures consistency for the undo/redo stacks
-            if not @locked 
-                # Flush the redo before adding a new message to prevent invalid
-                # references.
-                @_flush()
+            if not @locked
                 # Record this message to the hub
                 message = @_record(publisher, args)
 
@@ -200,24 +211,16 @@ do (window) ->
         # Undo the last message for this hub. Recursively skip any pubs
         # which have an unsubscribed publisher.
         undo: ->
-
             if (message = @undos.pop())
                 @redos.push message
-                if not message.publisher.active
-                    @undo()
-                else
-                    @_backwards message
+                if message.available() then @_backwards message else @undo()
 
         # Redo the next message for this hub. Recursively skip any pubs
         # which have an unsubscribed publisher.
         redo: ->
-
             if (message = @redos.pop())
                 @undos.push message
-                if not message.publisher.active
-                    @redo()
-                else
-                    @_forwards message
+                if message.available() then @_forwards message else @redo()
 
         # Encapsulates a _new_ ``forwards`` execution. This hub is locked for
         # the during of this call stack (relative to the handler) to prevent
@@ -226,7 +229,6 @@ do (window) ->
         # Errors must be caught here to ensure other subscribers are not
         # affected downstream.
         _transaction: (subscriber, message, args) ->
-
             if not @locked
                 @locked = true
                 try
@@ -285,30 +287,34 @@ do (window) ->
         # Takes each message in the ``redos`` and removes and  deferences them
         # from the respective ``publisher`` and the hub.
         _flush: ->
-            for _ in @redos
+            len = @redos.length
+            while len--
                 message = @redos.shift()
-                message.publisher.messages.pop()
-                delete @messages[message.id]
+                @_purge message
+
+        # If ``undoStackSize`` has been defined, the oldest undo will be
+        # shifted off from the front of the stack.
+        _prune: ->
+            if @undoStackSize and @undos.length is @undoStackSize
+                message = @undos.shift()
+                @_purge message
+
+        # Purges messages that are no longer valid in the hub's current state. 
+        # This includes _flushed_ messages from the ``redos`` stack as well as
+        # ``undos`` that have been shifted off the beginning of the stack.
+        _purge: (message) ->
+            message.publisher.purge message
+            delete @messages[message.id]
 
         # Create a new ``message``, store a reference to the last message relative
         # to the publisher. This is for idempotent (or those without a
         # ``backwards`` handler) subscribers.
-        # 
-        # This ``message`` is added to the publisher messages, the undo stack and
-        # is set as the hub's ``tip`` message.
-        #
-        # If ``undoStackSize`` has been defined, the oldest undo will be shifted off the
-        # front of the stack.
         _record: (publisher, args) ->
+            @_flush()
             message = new Message publisher, args
-            @messages[message.id] = message
-            publisher.messages.push message
-
-            if @undoStackSize and @undos.length is @undoStackSize
-                @undos.shift()
+            @_prune()
             @undos.push message
-
             @tip = message
-
+            message
 
     window.PubSub = PubSub
