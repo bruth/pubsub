@@ -50,10 +50,10 @@ var __slice = Array.prototype.slice;
       this.undos = [];
       this.redos = [];
     }
-    PubSub.prototype.subscribe = function(topic, forwards, backwards, context, history) {
-      var message, messages, publish, publisher, subscriber, _i, _len;
-      if (history == null) {
-        history = 'full';
+    PubSub.prototype.subscribe = function(topic, forwards, backwards, context, migrate) {
+      var publish, publisher, subscriber;
+      if (migrate == null) {
+        migrate = true;
       }
       if (typeof topic === 'number') {
         if (!(subscriber = this.subscribers[topic])) {
@@ -73,16 +73,20 @@ var __slice = Array.prototype.slice;
         this.subscribers[subscriber.id] = subscriber;
         publisher.subscribers.push(subscriber);
       }
+      if (migrate) {
+        this._migrate(publisher, subscriber, migrate);
+      }
+      return subscriber.id;
+    };
+    PubSub.prototype._migrate = function(publisher, subscriber, type) {
+      var message, messages, _i, _len;
       if (publisher.messages.length) {
-        switch (history) {
-          case 'full':
+        switch (type) {
+          case true:
             messages = publisher.messages;
             break;
           case 'tip':
             messages = [publisher.tip()];
-            break;
-          default:
-            messages = [];
         }
         for (_i = 0, _len = messages.length; _i < _len; _i++) {
           message = messages[_i];

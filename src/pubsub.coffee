@@ -68,7 +68,6 @@ do (window) ->
             @undos = []
             @redos = []
 
-
         # Subscribes a handler for the given publisher. For [idempotent][1]
         # subscribers, only the ``forwards`` handler is required. For
         # non-idempotent subscribers a ``backwards`` handler must also be
@@ -77,19 +76,17 @@ do (window) ->
         # An optional ``context`` can be supplied for the ``forwards`` and
         # ``backwards`` handlers. 
         #
-        # The ``history`` parameter can be supplied to ensure this subscriber
-        # "catches up" in state. ``full`` (default) can be supplied to
-        # apply the full message messages for this publisher. ``tip`` can be
-        # supplied to only execute the last message on the queue.
+        # When a new (or existing) subscriber is created, by default, any
+        # messages that have already been queued up by the publisher is
+        # forwarded to the subscriber. Migration can be turned off ``false`` to
+        # prevent migrating.
         #
-        # A subscriber ID can be passed in to _resume_ a previous subscription.
-        # If this method is used, a second parameter can be supplied to
-        # specify whether the subscriber should apply this publisher's publish
-        # messages. If a publisher ``topic`` is passed in without a ``forwards``
-        # handler, the publisher will be re-activated.
+        # In addition to new subscribers, an existing subscriber can be
+        # re-subscribed. If this method is used, the second parameter is
+        # the ``migrate`` paramter.
         #
         # [1]: http://en.wikipedia.org/wiki/Idempotence
-        subscribe: (topic, forwards, backwards, context, history='full') ->
+        subscribe: (topic, forwards, backwards, context, migrate=true) ->
 
             if typeof topic is 'number'
                 if not (subscriber = @subscribers[topic]) then return
@@ -109,16 +106,19 @@ do (window) ->
                 @subscribers[subscriber.id] = subscriber
                 publisher.subscribers.push subscriber
 
+            if migrate then @_migrate publisher, subscriber, migrate
+
+            return subscriber.id
+
+        _migrate: (publisher, subscriber, type) ->
             # Ensure this new subscriber does not go past the hub's current
             # state and does not respond to a former message.
             if publisher.messages.length
-                switch history
-                    when 'full'
+                switch type
+                    when true
                         messages = publisher.messages
                     when 'tip'
                         messages = [publisher.tip()]
-                    else
-                        messages = []
 
                 for message in messages
                     if message.id > @tip.id

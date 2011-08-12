@@ -56,16 +56,14 @@ defined to ensure consistency during undo/redo operations.</p>
 <p>An optional <code>context</code> can be supplied for the <code>forwards</code> and
 <code>backwards</code> handlers. </p>
 
-<p>The <code>history</code> parameter can be supplied to ensure this subscriber
-"catches up" in state. <code>full</code> (default) can be supplied to
-apply the full message messages for this publisher. <code>tip</code> can be
-supplied to only execute the last message on the queue.</p>
+<p>When a new (or existing) subscriber is created, by default, any
+messages that have already been queued up by the publisher is
+forwarded to the subscriber. Migration can be turned off <code>false</code> to
+prevent migrating.</p>
 
-<p>A subscriber ID can be passed in to <em>resume</em> a previous subscription.
-If this method is used, a second parameter can be supplied to
-specify whether the subscriber should apply this publisher's publish
-messages. If a publisher <code>topic</code> is passed in without a <code>forwards</code>
-handler, the publisher will be re-activated.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">subscribe: </span><span class="nf">(topic, forwards, backwards, context, history=&#39;full&#39;) -&gt;</span>
+<p>In addition to new subscribers, an existing subscriber can be
+re-subscribed. If this method is used, the second parameter is
+the <code>migrate</code> paramter.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">subscribe: </span><span class="nf">(topic, forwards, backwards, context, migrate=true) -&gt;</span>
 
             <span class="k">if</span> <span class="k">typeof</span> <span class="nx">topic</span> <span class="o">is</span> <span class="s1">&#39;number&#39;</span>
                 <span class="k">if</span> <span class="o">not</span> <span class="p">(</span><span class="nv">subscriber = </span><span class="nx">@subscribers</span><span class="p">[</span><span class="nx">topic</span><span class="p">])</span> <span class="k">then</span> <span class="k">return</span>
@@ -83,15 +81,19 @@ handler, the publisher will be re-activated.</p>             </td>             <
                 <span class="nv">subscriber = </span><span class="k">new</span> <span class="nx">Subscriber</span> <span class="nx">publisher</span><span class="p">,</span> <span class="nx">forwards</span><span class="p">,</span> <span class="nx">backwards</span><span class="p">,</span> <span class="nx">context</span>
 
                 <span class="nx">@subscribers</span><span class="p">[</span><span class="nx">subscriber</span><span class="p">.</span><span class="nx">id</span><span class="p">]</span> <span class="o">=</span> <span class="nx">subscriber</span>
-                <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">push</span> <span class="nx">subscriber</span></pre></div>             </td>           </tr>                               <tr id="section-8">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-8">&#182;</a>               </div>               <p>Ensure this new subscriber does not go past the hub's current
+                <span class="nx">publisher</span><span class="p">.</span><span class="nx">subscribers</span><span class="p">.</span><span class="nx">push</span> <span class="nx">subscriber</span>
+
+            <span class="k">if</span> <span class="nx">migrate</span> <span class="k">then</span> <span class="nx">@_migrate</span> <span class="nx">publisher</span><span class="p">,</span> <span class="nx">subscriber</span><span class="p">,</span> <span class="nx">migrate</span>
+
+            <span class="k">return</span> <span class="nx">subscriber</span><span class="p">.</span><span class="nx">id</span>
+
+        <span class="nv">_migrate: </span><span class="nf">(publisher, subscriber, type) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-8">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-8">&#182;</a>               </div>               <p>Ensure this new subscriber does not go past the hub's current
 state and does not respond to a former message.</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">if</span> <span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span><span class="p">.</span><span class="nx">length</span>
-                <span class="k">switch</span> <span class="nx">history</span>
-                    <span class="k">when</span> <span class="s1">&#39;full&#39;</span>
+                <span class="k">switch</span> <span class="nx">type</span>
+                    <span class="k">when</span> <span class="kc">true</span>
                         <span class="nv">messages = </span><span class="nx">publisher</span><span class="p">.</span><span class="nx">messages</span>
                     <span class="k">when</span> <span class="s1">&#39;tip&#39;</span>
                         <span class="nv">messages = </span><span class="p">[</span><span class="nx">publisher</span><span class="p">.</span><span class="nx">tip</span><span class="p">()]</span>
-                    <span class="k">else</span>
-                        <span class="nv">messages = </span><span class="p">[]</span>
 
                 <span class="k">for</span> <span class="nx">message</span> <span class="k">in</span> <span class="nx">messages</span>
                     <span class="k">if</span> <span class="nx">message</span><span class="p">.</span><span class="nx">id</span> <span class="o">&gt;</span> <span class="nx">@tip</span><span class="p">.</span><span class="nx">id</span>
