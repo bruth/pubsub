@@ -7,9 +7,6 @@
 
 do (window) ->
 
-    # Add helper function to Array
-    if not Array::last then Array::last = -> @[@length - 1]
-
     # Internal unique identifiers for messages and subscribers global to the
     # PubSub constructor. This ensures cross hub references never clash.
     suid = 1
@@ -51,6 +48,8 @@ do (window) ->
             @subscribers = []
             @messages = []
             @active = true
+
+        tip: -> @messages[@messages.length - 1]
 
     class PubSub
         version: '@VERSION'
@@ -114,7 +113,7 @@ do (window) ->
                     when 'full'
                         messages = publisher.messages
                     when 'tip'
-                        messages = [publisher.messages.last()]
+                        messages = [publisher.tip()]
                     else
                         messages = []
 
@@ -298,7 +297,7 @@ do (window) ->
         # If ``undoStackSize`` has been defined, the oldest undo will be shifted off the
         # front of the stack.
         _record: (publisher, args) ->
-            message = new Message publisher, args, publisher.messages.last()
+            message = new Message publisher, args, publisher.tip()
             @messages[message.id] = message
             publisher.messages.push message
 

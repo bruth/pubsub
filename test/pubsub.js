@@ -1,11 +1,6 @@
 var __slice = Array.prototype.slice;
 (function(window) {
   var Message, PubSub, Publisher, Subscriber, muid, suid;
-  if (!Array.prototype.last) {
-    Array.prototype.last = function() {
-      return this[this.length - 1];
-    };
-  }
   suid = 1;
   muid = 1;
   Subscriber = (function() {
@@ -36,6 +31,9 @@ var __slice = Array.prototype.slice;
       this.messages = [];
       this.active = true;
     }
+    Publisher.prototype.tip = function() {
+      return this.messages[this.messages.length - 1];
+    };
     return Publisher;
   })();
   PubSub = (function() {
@@ -78,7 +76,7 @@ var __slice = Array.prototype.slice;
             messages = publisher.messages;
             break;
           case 'tip':
-            messages = [publisher.messages.last()];
+            messages = [publisher.tip()];
             break;
           default:
             messages = [];
@@ -253,7 +251,7 @@ var __slice = Array.prototype.slice;
     };
     PubSub.prototype._record = function(publisher, args) {
       var message;
-      message = new Message(publisher, args, publisher.messages.last());
+      message = new Message(publisher, args, publisher.tip());
       this.messages[message.id] = message;
       publisher.messages.push(message);
       if (this.undoStackSize && this.undos.length === this.undoStackSize) {
