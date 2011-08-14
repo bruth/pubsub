@@ -59,14 +59,14 @@ test 'Subscribe - late', 6, ->
 
     sub2 = hub.subscribe 'foo', ->
         output++
-    , null, null, 'tip'
+    , 'tip'
 
     equals output, 4, 'only the tip of the history was executed'
     equals sub2.tip, p3.tip(), 'last pub is referenced'
 
     sub3 = hub.subscribe 'foo', ->
         output++
-    , null, null, false
+    , false
 
     equals output, 4, 'none of the history is applied'
     equals sub3.tip, null, 'no pub has been applied'

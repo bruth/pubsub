@@ -106,7 +106,7 @@ var __slice = Array.prototype.slice;
       return this.undos[this.undos.length - 1];
     };
     PubSub.prototype.subscribe = function(topic, forwards, backwards, context, migrate) {
-      var publisher, subscriber;
+      var publisher, subscriber, _ref;
       if (migrate == null) {
         migrate = true;
       }
@@ -116,6 +116,9 @@ var __slice = Array.prototype.slice;
         publisher = subscriber.publisher;
         migrate = forwards || migrate;
       } else {
+        if (backwards === true || backwards === 'tip' || backwards === false) {
+          _ref = [backwards, migrate], migrate = _ref[0], backwards = _ref[1];
+        }
         publisher = this._addPublisher(topic);
         subscriber = this._addSubscriber(publisher, forwards, backwards, context);
       }

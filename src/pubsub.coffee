@@ -130,6 +130,10 @@ do (window) ->
                 publisher = subscriber.publisher
                 migrate = forwards or migrate 
             else
+                # Handle the shorthand notation, only handling topic, subscriber
+                # and migrate.
+                if backwards in [true, 'tip', false]
+                    [migrate, backwards] = [backwards, migrate]
                 publisher = @_addPublisher topic
                 subscriber = @_addSubscriber publisher, forwards, backwards, context
 

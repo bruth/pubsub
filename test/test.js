@@ -53,12 +53,12 @@ test('Subscribe - late', 6, function() {
   equals(sub1.tip, p3.tip(), 'last pub is referenced');
   sub2 = hub.subscribe('foo', function() {
     return output++;
-  }, null, null, 'tip');
+  }, 'tip');
   equals(output, 4, 'only the tip of the history was executed');
   equals(sub2.tip, p3.tip(), 'last pub is referenced');
   sub3 = hub.subscribe('foo', function() {
     return output++;
-  }, null, null, false);
+  }, false);
   equals(output, 4, 'none of the history is applied');
   return equals(sub3.tip, null, 'no pub has been applied');
 });
