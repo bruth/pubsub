@@ -59,48 +59,6 @@ hub.subscribe('foo', function(msg) {
 output; // undefined
 ```
 
-History API
------------
-PubSub has a very simple history API with ``undo`` and ``redo`` methods.
-For [idempotent][1] subscribers, only a single function is required to be
-supplied (like the above example).
-
-For non-idempotent subscribers, two handlers should be supplied representing the
-``forwards`` and ``backwards`` operations. The below example shows this.
-
-[1]: http://en.wikipedia.org/wiki/Idempotence
-
-```javascript
-var hub = new PubSub;
-
-function Counter() {
-    this.count = 0
-    this.incr = function() {
-        this.count++;
-    }
-    this.decr = function() {
-        this.count--;
-    }
-}
-
-var counter = new Counter;
-
-hub.subscribe('click', counter.incr, counter.decr);
-
-hub.publish('click');
-hub.publish('click');
-counter.count; // 2
-
-hub.undo();
-counter.count; // 1
-
-hub.redo();
-counter.count; // 2
-```
-
-If the history API is not used at all, the ``backwards`` is not necessary
-regardless of the idempotency.
-
 Unsubscribing
 -------------
 When a subscription occurs, the new subscriber is returned. The instanced can
