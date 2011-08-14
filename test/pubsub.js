@@ -12,22 +12,26 @@ var __slice = Array.prototype.slice;
       this.id = suid++;
       this.online = true;
       this.tip = null;
-      this.hub = this.publisher.hub;
     }
     return Subscriber;
   })();
   Message = (function() {
-    function Message(publisher, content) {
+    function Message(publisher, content, temp) {
       this.publisher = publisher;
       this.content = content;
-      this.id = muid++;
-      this.previous = this.publisher.tip();
-      this.publisher.messages.push(this);
-      this.hub = this.publisher.hub;
-      this.hub.messages[this.id] = this;
+      this.temp = temp != null ? temp : false;
+      if (!this.temp) {
+        this.id = muid++;
+        this.previous = this.publisher.tip();
+        this.publisher.messages.push(this);
+      }
     }
     Message.prototype.copy = function() {
-      return this.content.slice();
+      if (this.content) {
+        return this.content.slice();
+      } else {
+        return [];
+      }
     };
     Message.prototype.available = function() {
       return this.publisher.active;
@@ -35,13 +39,15 @@ var __slice = Array.prototype.slice;
     return Message;
   })();
   Publisher = (function() {
-    function Publisher(hub, topic) {
-      this.hub = hub;
+    function Publisher(topic) {
       this.topic = topic;
       this.subscribers = [];
       this.messages = [];
       this.active = true;
     }
+    Publisher.prototype.tip = function() {
+      return this.messages[this.messages.length - 1];
+    };
     Publisher.prototype._add = function(subscriber) {
       return this.subscribers.push(subscriber);
     };
@@ -57,10 +63,7 @@ var __slice = Array.prototype.slice;
       }
       return _results;
     };
-    Publisher.prototype.tip = function() {
-      return this.messages[this.messages.length - 1];
-    };
-    Publisher.prototype.purge = function(message) {
+    Publisher.prototype._purge = function(message) {
       var len, _results;
       len = this.messages.length;
       _results = [];
@@ -75,20 +78,19 @@ var __slice = Array.prototype.slice;
     return Publisher;
   })();
   PubSub = (function() {
-    PubSub.prototype.version = '0.2.1';
+    PubSub.prototype.version = '0.3';
     function PubSub(undoStackSize) {
       this.undoStackSize = undoStackSize;
       this.publishers = {};
       this.subscribers = {};
       this.messages = {};
-      this.tip = null;
       this.undos = [];
       this.redos = [];
     }
     PubSub.prototype._addPublisher = function(topic) {
       var publisher;
       if (!(publisher = this.publishers[topic])) {
-        publisher = new Publisher(this, topic);
+        publisher = new Publisher(topic);
         this.publishers[topic] = publisher;
       }
       return publisher;
@@ -99,6 +101,9 @@ var __slice = Array.prototype.slice;
       this.subscribers[subscriber.id] = subscriber;
       publisher._add(subscriber);
       return subscriber;
+    };
+    PubSub.prototype.tip = function() {
+      return this.undos[this.undos.length - 1];
     };
     PubSub.prototype.subscribe = function(topic, forwards, backwards, context, migrate) {
       var publisher, subscriber;
@@ -119,30 +124,6 @@ var __slice = Array.prototype.slice;
       }
       return subscriber;
     };
-    PubSub.prototype._migrate = function(publisher, subscriber, type) {
-      var message, messages, _i, _len;
-      if (publisher.messages.length) {
-        switch (type) {
-          case true:
-            messages = publisher.messages;
-            break;
-          case 'tip':
-            messages = [publisher.tip()];
-        }
-        for (_i = 0, _len = messages.length; _i < _len; _i++) {
-          message = messages[_i];
-          if (message.id > this.tip.id) {
-            break;
-          }
-          if (subscriber.tip && subscriber.tip.id >= message.id) {
-            continue;
-          }
-          subscriber.forwards.apply(subscriber.context, message.copy());
-        }
-        subscriber.tip = message;
-      }
-      return subscriber.id;
-    };
     PubSub.prototype.unsubscribe = function(subscriber, complete) {
       if (complete == null) {
         complete = false;
@@ -160,35 +141,27 @@ var __slice = Array.prototype.slice;
       }
     };
     PubSub.prototype.publish = function() {
-      var args, message, publisher, subscriber, topic, _i, _len, _ref;
-      topic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      if (!(publisher = this.publishers[topic])) {
-        publisher = this.publishers[topic] = new Publisher(this, topic);
-      } else if (!publisher.active) {
+      var content, message, publisher, topic, _init;
+      topic = arguments[0], content = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      publisher = this._addPublisher(topic);
+      if (!publisher.active) {
         return;
       }
-      message = null;
-      if (!this.locked) {
-        message = this._record(publisher, args);
+      _init = this.locked ? this._temp : this._record;
+      message = _init.call(this, publisher, content);
+      if (!this.direction || this.direction === 'forward') {
+        this._forwardAll(message);
+      } else {
+        this._backwardAll(message);
       }
-      if (publisher.subscribers.length) {
-        _ref = publisher.subscribers;
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          subscriber = _ref[_i];
-          if (!subscriber.online) {
-            continue;
-          }
-          this._transaction(subscriber, message, args.slice(0));
-        }
-      }
-      return message && message.id;
+      return publisher;
     };
     PubSub.prototype.undo = function() {
       var message;
       if ((message = this.undos.pop())) {
         this.redos.push(message);
         if (message.available()) {
-          return this._backwards(message);
+          return this._backwardAll(message);
         } else {
           return this.undo();
         }
@@ -199,72 +172,125 @@ var __slice = Array.prototype.slice;
       if ((message = this.redos.pop())) {
         this.undos.push(message);
         if (message.available()) {
-          return this._forwards(message);
+          return this._forwardAll(message);
         } else {
           return this.redo();
         }
       }
     };
-    PubSub.prototype._transaction = function(subscriber, message, args) {
+    PubSub.prototype._migrate = function(publisher, subscriber, type) {
+      var htip, messages, stip;
+      if (publisher.messages.length) {
+        htip = this.tip().id;
+        stip = (stip = subscriber.tip) ? stip.id : -1;
+        if (htip === stip) {
+          return;
+        }
+        messages = publisher.messages;
+        if (htip > stip) {
+          if (type === 'tip') {
+            messages = [publisher.tip()];
+          }
+          return this._migrateForward(messages, subscriber, stip);
+        } else {
+          return this._migrateBackward(messages, subscriber, stip);
+        }
+      }
+    };
+    PubSub.prototype._migrateForward = function(messages, subscriber, tip) {
+      var message, _i, _len, _results;
+      _results = [];
+      for (_i = 0, _len = messages.length; _i < _len; _i++) {
+        message = messages[_i];
+        if (message.id <= tip) {
+          continue;
+        }
+        _results.push(this._forwardOne(message, subscriber));
+      }
+      return _results;
+    };
+    PubSub.prototype._migrateBackward = function(messages, subscriber, tip) {
+      var len, message, _results;
+      len = messages.length;
+      _results = [];
+      while (len--) {
+        message = messages[len];
+        if (tip <= message.id) {
+          continue;
+        }
+        _results.push(this._backwardOne(message, subscriber));
+      }
+      return _results;
+    };
+    PubSub.prototype._forwardAll = function(message, tip) {
+      var subscriber, _i, _len, _ref;
+      _ref = message.publisher.subscribers;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        subscriber = _ref[_i];
+        this._forwardOne(message, subscriber, tip);
+      }
+    };
+    PubSub.prototype._forwardOne = function(message, subscriber) {
+      if (!subscriber.online) {
+        return;
+      }
       if (!this.locked) {
         this.locked = true;
+        this.direction = 'forward';
         try {
-          subscriber.forwards.apply(subscriber.context, args);
-          return subscriber.tip = message;
+          this.__forward(message, subscriber);
+          subscriber.tip = message;
         } finally {
           this.locked = false;
+          this.direction = null;
         }
       } else {
+        this.__forward(message, subscriber);
+      }
+    };
+    PubSub.prototype.__forward = function(message, subscriber) {
+      return subscriber.forwards.apply(subscriber.context, message.copy());
+    };
+    PubSub.prototype._backwardAll = function(message, tip) {
+      var len, subscribers;
+      subscribers = message.publisher.subscribers;
+      len = subscribers.length;
+      while (len--) {
+        this._backwardOne(message, subscribers[len], tip);
+      }
+    };
+    PubSub.prototype._backwardOne = function(message, subscriber) {
+      if (!subscriber.online) {
+        return;
+      }
+      if (!this.locked) {
+        this.locked = true;
+        this.direction = 'backward';
         try {
-          return subscriber.forwards.apply(subscriber.context, args);
-        } catch (_e) {}
+          this.__backward(subscriber, message);
+          subscriber.tip = message;
+        } finally {
+          this.locked = false;
+          this.direction = null;
+        }
+      } else {
+        this.__backward(subscriber, message);
       }
     };
-    PubSub.prototype._forwards = function(message) {
-      var publisher, subscriber, _i, _len, _ref;
-      publisher = message.publisher;
-      if (publisher.subscribers.length) {
-        _ref = publisher.subscribers;
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          subscriber = _ref[_i];
-          if (!subscriber.online) {
-            continue;
-          }
-          try {
-            subscriber.forwards.apply(subscriber.context, message.copy());
-          } finally {
-            subscriber.tip = message;
-          }
+    PubSub.prototype.__backward = function(subscriber, message) {
+      var copy;
+      if (subscriber.backwards) {
+        return subscriber.backwards.apply(subscriber.context, message.copy());
+      } else {
+        if (message.temp) {
+          copy = message.copy();
+        } else if (message.previous) {
+          copy = message.previous.copy();
+        } else {
+          copy = [];
         }
+        return subscriber.forwards.apply(subscriber.context, copy);
       }
-      return this.tip = message;
-    };
-    PubSub.prototype._backwards = function(message) {
-      var publisher, subscriber, _i, _len, _ref;
-      publisher = message.publisher;
-      if (publisher.subscribers.length) {
-        _ref = publisher.subscribers;
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          subscriber = _ref[_i];
-          if (!subscriber.online) {
-            continue;
-          }
-          try {
-            if (!subscriber.backwards) {
-              if (message.previous) {
-                subscriber.forwards.apply(subscriber.context, message.previous.copy());
-              } else {
-                subscriber.forwards.apply(subscriber.context);
-              }
-            } else {
-              subscriber.backwards.apply(subscriber.context, message.copy());
-            }
-          } finally {
-            subscriber.tip = message;
-          }
-        }
-      }
-      return this.tip = message;
     };
     PubSub.prototype._flush = function() {
       var len, message, _results;
@@ -284,17 +310,20 @@ var __slice = Array.prototype.slice;
       }
     };
     PubSub.prototype._purge = function(message) {
-      message.publisher.purge(message);
+      message.publisher._purge(message);
       return delete this.messages[message.id];
     };
-    PubSub.prototype._record = function(publisher, args) {
+    PubSub.prototype._record = function(publisher, content) {
       var message;
       this._flush();
-      message = new Message(publisher, args);
+      message = new Message(publisher, content);
+      this.messages[message.id] = this;
       this._prune();
       this.undos.push(message);
-      this.tip = message;
       return message;
+    };
+    PubSub.prototype._temp = function(publisher, content) {
+      return new Message(publisher, content, true);
     };
     return PubSub;
   })();

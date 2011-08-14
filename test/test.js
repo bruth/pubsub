@@ -1,28 +1,43 @@
 var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
-test('Publish', 3, function() {
-  var hub, output;
+test('Publisher', 7, function() {
+  var hub, p;
+  hub = new PubSub;
+  hub.publish('foo', 1);
+  hub.publish('foo', 2);
+  p = hub.publish('foo', 3);
+  equals(p.messages.length, 3);
+  equals(p.tip().content[0], 3);
+  p.active = false;
+  ok(!hub.publish('foo', 'nope'));
+  equals(p.messages.length, 3, 'not recorded');
+  p.active = true;
+  ok(hub.publish('foo', 'yep'));
+  p = hub.publish('bar', 1, 2, 3, 4);
+  equals(p.messages.length, 1);
+  p = hub.publish('baz', function() {});
+  return equals(p.messages.length, 1);
+});
+test('Subscriber', 6, function() {
+  var hub, output, s1, s2;
   hub = new PubSub;
   output = null;
-  hub.subscribe('foo', function(msg) {
+  s1 = hub.subscribe('foo', function(msg) {
     return output = msg;
   });
-  hub.publish('foo', 'hello moto');
-  equals(output, 'hello moto', 'updated');
-  hub.publish('bar', 'something new');
-  equals(output, 'hello moto', 'nothing changed due to a new topic');
-  hub.publish('foo', 'and again');
-  return equals(output, 'and again', 'updated');
-});
-test('Subscribe', 3, function() {
-  var hub, output, sub;
-  hub = new PubSub;
-  output = null;
-  sub = hub.subscribe('foo', function(msg) {
-    return output = msg;
+  hub.subscribe('foo', (function(msg) {
+    return output = "" + this + " " + msg;
+  }), null, 'goober');
+  s2 = hub.subscribe('foo', function(msg) {
+    return output = "moto " + msg;
   });
   ok(hub.publishers.foo, 'a new topic has been added');
-  ok(hub.subscribers[sub.id], 'the subscriber has been added');
-  return equals(output, null, 'nothing changed yet');
+  equals(s1.publisher.subscribers.length, 3, 'the subscriber has been added');
+  equals(output, null, 'nothing changed yet');
+  s2.online = false;
+  hub.publish('foo', 4);
+  ok(s1.tip);
+  ok(!s2.tip);
+  return equals(output, 'goober 4');
 });
 test('Subscribe - late', 6, function() {
   var hub, output, p3, sub1, sub2, sub3;
@@ -35,12 +50,12 @@ test('Subscribe - late', 6, function() {
     return output++;
   });
   equals(output, 3, 'all history up to this point');
-  equals(sub1.tip.id, p3, 'last pub is referenced');
+  equals(sub1.tip, p3.tip(), 'last pub is referenced');
   sub2 = hub.subscribe('foo', function() {
     return output++;
   }, null, null, 'tip');
   equals(output, 4, 'only the tip of the history was executed');
-  equals(sub2.tip.id, p3, 'last pub is referenced');
+  equals(sub2.tip, p3.tip(), 'last pub is referenced');
   sub3 = hub.subscribe('foo', function() {
     return output++;
   }, null, null, false);
@@ -138,7 +153,7 @@ test('Undo/Redo', 12, function() {
   hub.redo();
   return equals(counter.count, 3, 'cannot go forward');
 });
-test('Partial Redo, New Pubs', 11, function() {
+test('Partial Redo, New Pubs', 12, function() {
   var hub, output;
   hub = new PubSub;
   output = void 0;
@@ -159,6 +174,7 @@ test('Partial Redo, New Pubs', 11, function() {
   equals(output, 'hello moto', 'back 1');
   hub.publish('foo', 'new path');
   equals(output, 'new path', 'updated');
+  equals(hub.redos.length, 0, 'redos flushed');
   hub.redo();
   equals(output, 'new path', 'stays the same');
   hub.undo();
@@ -170,7 +186,7 @@ test('Partial Redo, New Pubs', 11, function() {
   hub.redo();
   return equals(output, 'new path', 'cannot go forward');
 });
-test('Non-Idempotent Partial Redo, New Pubs', 11, function() {
+test('Non-Idempotent Partial Redo, New Pubs', 12, function() {
   var Counter, counter, hub;
   hub = new PubSub;
   Counter = function() {
@@ -200,6 +216,7 @@ test('Non-Idempotent Partial Redo, New Pubs', 11, function() {
   hub.undo();
   equals(counter.count, 1, '-1');
   hub.publish('foo');
+  equals(hub.redos.length, 0, 'redos flushed');
   hub.publish('foo');
   equals(counter.count, 3, '+2');
   hub.redo();
@@ -210,4 +227,61 @@ test('Non-Idempotent Partial Redo, New Pubs', 11, function() {
   hub.redo();
   hub.redo();
   return equals(counter.count, 3, 'back to tip');
+});
+test('Nested Publish Calls', function() {
+  var Counter, c1, c2, hub, out;
+  hub = new PubSub;
+  Counter = function() {
+    this.count = 0;
+    this.incr = __bind(function() {
+      return ++this.count;
+    }, this);
+    this.decr = __bind(function() {
+      return --this.count;
+    }, this);
+    return this;
+  };
+  c1 = new Counter;
+  c2 = new Counter;
+  hub.subscribe('foo', function() {
+    return hub.publish('bar', c1.incr());
+  }, function() {
+    return hub.publish('bar', c1.decr());
+  });
+  hub.subscribe('bar', function() {
+    if (c2.count < 3) {
+      return c2.incr();
+    }
+  }, function() {
+    if (c2.count > 0) {
+      return c2.decr();
+    }
+  });
+  hub.publish('foo');
+  equals(c1.count, 1);
+  equals(c2.count, 1);
+  hub.undo();
+  equals(c1.count, 0);
+  equals(c2.count, 0);
+  hub.redo();
+  equals(c1.count, 1);
+  equals(c2.count, 1);
+  hub.publish('foo');
+  hub.publish('foo');
+  hub.publish('foo');
+  equals(c1.count, 4);
+  equals(c2.count, 3);
+  hub.undo();
+  hub.undo();
+  equals(c1.count, 2);
+  equals(c2.count, 1);
+  out = 0;
+  hub.subscribe('bar', function(count) {
+    return out = Math.pow(2, count);
+  });
+  equals(out, 0);
+  hub.redo();
+  equals(out, 8);
+  hub.undo();
+  return equals(out, 4);
 });

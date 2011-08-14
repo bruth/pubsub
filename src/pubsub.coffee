@@ -19,30 +19,29 @@ do (window) ->
     # ``context`` can also be supplied to be the context for the handlers.
     #
     # ``tip`` represents the last message this subscriber has received. A
-    # subscriber can be deactivated at any time to prevent (or suspend) future
-    # messages from being received. On re-activation, it can optionally receive
-    # the queued up messages since it was last subscribed.
+    # subscriber can be deactivated at any time by setting ``online`` to
+    # ``false``. This prevents future messages from being received. If the
+    # subscriber comes back _online_, it can optionally receive the queued
+    # up messages since it was last subscribed.
     class Subscriber
         constructor: (@publisher, @forwards, @backwards, @context) ->
             @id = suid++
             @online = true
             @tip = null
-            @hub = @publisher.hub
 
     # Message
     # -------
-    # A message is created and sent by it's ``publisher``. A message is
-    # composed simply of arguments that will be passed into the subscriber's
-    # handlers.
+    # A message is created and sent by it's ``publisher``. It is composed
+    # simply of the arguments passed in on a ``publish`` call. The content
+    # will be passed to the subscriber's handlers.
     class Message
-        constructor: (@publisher, @content) ->
-            @id = muid++
-            @previous = @publisher.tip()
-            @publisher.messages.push @ 
-            @hub = @publisher.hub
-            @hub.messages[@id] = @
+        constructor: (@publisher, @content, @temp=false) ->
+            if not @temp
+                @id = muid++
+                @previous = @publisher.tip()
+                @publisher.messages.push @
 
-        copy: -> @content.slice()
+        copy: -> if @content then @content.slice() else []
 
         available: -> @publisher.active
 
@@ -53,10 +52,12 @@ do (window) ->
     # be deactivated. During this time, no messages will be queued nor
     # broadcasted to it's subscribers.
     class Publisher
-        constructor: (@hub, @topic) ->
+        constructor: (@topic) ->
             @subscribers = []
             @messages = []
             @active = true
+
+        tip: -> @messages[@messages.length - 1]
 
         _add: (subscriber) -> @subscribers.push subscriber
 
@@ -68,33 +69,31 @@ do (window) ->
                     @subscriber.pop len
                     break
 
-        tip: -> @messages[@messages.length - 1]
-
-        # Purges a message given it's id.
-        purge: (message) ->
+        # Purges a message from this publisher's queue.
+        _purge: (message) ->
             len = @messages.length
             while len--
                 if message is @messages[len]
                     @messages.pop len
                     break
 
+    # The ``PubSub`` constructor takes a single optional argument
+    # ``undoStackSize`` which specifies a limit to the undo stack size. If
+    # it reaches the limit, the oldest undo will be shifted off the bottom
+    # of the stack.
     class PubSub
         version: '@VERSION'
 
-        # The ``PubSub`` constructor takes a single optional argument
-        # ``undoStackSize`` which specifies a limit to the undo stack size. If
-        # it reaches the limit, the oldest undo will be shifted off
         constructor: (@undoStackSize) ->
             @publishers = {}
             @subscribers = {}
             @messages = {}
-            @tip = null
             @undos = []
             @redos = []
 
         _addPublisher: (topic) ->
             if not (publisher = @publishers[topic])
-                publisher = new Publisher @, topic
+                publisher = new Publisher topic
                 @publishers[topic] = publisher
             return publisher
 
@@ -103,6 +102,8 @@ do (window) ->
             @subscribers[subscriber.id] = subscriber
             publisher._add subscriber
             return subscriber
+
+        tip: -> @undos[@undos.length - 1]
 
         # Subscribes a handler for the given publisher. For [idempotent][1]
         # subscribers, only the ``forwards`` handler is required. For
@@ -113,13 +114,13 @@ do (window) ->
         # ``backwards`` handlers. 
         #
         # When a new (or existing) subscriber is created, by default, any
-        # messages that have already been queued up by the publisher is
-        # forwarded to the subscriber. Migration can be turned off ``false`` to
-        # prevent migrating.
+        # messages that have already been queued up by the publisher are
+        # forwarded to the subscriber. This _migration_ can be turned off
+        # ``false`` to prevent this behavior.
         #
         # In addition to new subscribers, an existing subscriber can be
         # re-subscribed. If this method is used, the second parameter is
-        # the ``migrate`` paramter.
+        # treated as the ``migrate`` paramter.
         #
         # [1]: http://en.wikipedia.org/wiki/Idempotence
         subscribe: (topic, forwards, backwards, context, migrate=true) ->
@@ -136,32 +137,8 @@ do (window) ->
 
             return subscriber
 
-        _migrate: (publisher, subscriber, type) ->
-            # Ensure this new subscriber does not go past the hub's current
-            # state and does not respond to a former message.
-            if publisher.messages.length
-                switch type
-                    when true
-                        messages = publisher.messages
-                    when 'tip'
-                        messages = [publisher.tip()]
-
-                for message in messages
-                    if message.id > @tip.id
-                        break
-                    if subscriber.tip and subscriber.tip.id >= message.id
-                        continue
-                    subscriber.forwards.apply subscriber.context, message.copy()
-
-                subscriber.tip = message
-
-            # return the subscriber id for later reference in the application
-            return subscriber.id
-
-        # Unsubscribe all subscribers for a given ``publisher`` is a publisher topic is
-        # supplied or unsubscribe a subscriber via their ``id``. If ``remove``
-        # is ``true``, all references to the unsubscribed object will be
-        # deleted from this hub.
+        # Unsubscribes a subscriber. If ``complete`` is ``true``, the
+        # subscriber will be completed dereferenced from the hub.
         unsubscribe: (subscriber, complete=false) ->
             if not subscriber instanceof Subscriber
                 return if not (subscriber = @subscribers[subscriber])
@@ -172,114 +149,161 @@ do (window) ->
             else
                 subscriber.online = false
 
-        # The workhorse of the ``publish`` method. For a publisher ``topic``, all
-        # subscribers will their ``forwards`` handler be executed with ``args``
-        # being passed in.
+        # Publishes content for the specified ``topic``. 
         #
-        # Currently, only top-level messages are recorded. If the hub's
-        # ``locked`` flag is ``true``, no message is recorded.
-        publish: (topic, args...) ->
+        # To support undo/redo operations only top-level calls to publish are
+        # recorded. For each subscriber handler, the hub becomes locked for the
+        # remainder of the _handling_. Once it finishes, the hub is unlocked
+        # for the next subscriber handler to be executed.
+        publish: (topic, content...) ->
+            publisher = @_addPublisher topic
+            return if not publisher.active
 
-            if not (publisher = @publishers[topic])
-                publisher = @publishers[topic] = new Publisher @, topic
-            else if not publisher.active
-                return
+            _init = if @locked then @_temp else @_record
+            message = _init.call @, publisher, content
+            if not @direction or @direction is 'forward'
+                @_forwardAll message
+            else
+                @_backwardAll message
 
-            message = null
+            return publisher
 
-            # A message will only be recorded when it's a top-level call.
-            # This ensures consistency for the undo/redo stacks
-            if not @locked
-                # Record this message to the hub
-                message = @_record(publisher, args)
-
-            # If there are any subscribers, execute their respective ``forwards``
-            # handlers.
-            if publisher.subscribers.length
-                for subscriber in publisher.subscribers
-                    # Skip temporarily unsubscribed subscribers
-                    if not subscriber.online then continue
-                    # Create copies of ``args`` to ensure no side-effects
-                    # between subscribers.
-                    @_transaction subscriber, message, args.slice(0)
-
-            return message and message.id
-
-        # Undo the last message for this hub. Recursively skip any pubs
-        # which have an unsubscribed publisher.
+        # Undo the last message for this hub. Recursively skip any messages
+        # whos publisher is inactive.
         undo: ->
             if (message = @undos.pop())
                 @redos.push message
-                if message.available() then @_backwards message else @undo()
+                if message.available() then @_backwardAll message else @undo()
 
-        # Redo the next message for this hub. Recursively skip any pubs
-        # which have an unsubscribed publisher.
+        # Redo the last message for this hub. Recursively skip any messages
+        # whos publisher is inactive.
         redo: ->
             if (message = @redos.pop())
                 @undos.push message
-                if message.available() then @_forwards message else @redo()
+                if message.available() then @_forwardAll message else @redo()
 
-        # Encapsulates a _new_ ``forwards`` execution. This hub is locked for
-        # the during of this call stack (relative to the handler) to prevent
-        # dependent messages from being recorded in the messages.
+        # Handles applying a migration for a subscriber depending on it's state
+        # relative to the publisher and hub.
+        _migrate: (publisher, subscriber, type) ->
+            if publisher.messages.length
+                # Determine whether the subscriber is ahead or behind in state
+                # relative to the hub.
+                htip = @tip().id
+                stip = if (stip = subscriber.tip) then stip.id else -1
+
+                return if htip is stip
+
+                messages = publisher.messages
+
+                # Must migrate forward
+                if htip > stip
+                    if type is 'tip'
+                        messages = [publisher.tip()]
+                    @_migrateForward messages, subscriber, stip
+                else
+                    @_migrateBackward messages, subscriber, stip
+
+
+        # Applies a forward migration in the ascending order.
+        _migrateForward: (messages, subscriber, tip) ->
+            for message in messages
+                continue if message.id <= tip
+                @_forwardOne message, subscriber
+
+        # Applies a backward migration in the descending order.
+        _migrateBackward: (messages, subscriber, tip) ->
+            len = messages.length
+            while len--
+                message = messages[len]
+                continue if tip <= message.id
+                @_backwardOne message, subscriber
+
+
+        # Broadcasts a mesage to all subscribers of the messages' publisher.
+        _forwardAll: (message, tip) ->
+            for subscriber in message.publisher.subscribers
+                @_forwardOne message, subscriber, tip
+            return
+
+        # Given a message and subscriber, forward the message to the subscriber
+        # only if the subscriber is online and does not exceed the ``tip``
+        # message. What ``tip`` denotes varies on the context of the
+        # forwarding.
+        #
+        # This hub is locked for the during of this call stack (relative to
+        # the handler) to prevent dependent messages from being recorded in
+        # the messages.
         #
         # Errors must be caught here to ensure other subscribers are not
         # affected downstream.
-        _transaction: (subscriber, message, args) ->
+        _forwardOne: (message, subscriber) ->
+            return if not subscriber.online
             if not @locked
                 @locked = true
+                @direction = 'forward'
                 try
-                    subscriber.forwards.apply subscriber.context, args
+                    @__forward message, subscriber
                     subscriber.tip = message
                 finally
                     @locked = false
+                    @direction = null
             else
-                try subscriber.forwards.apply subscriber.context, args
+                @__forward message, subscriber
+            return
 
-        # The logic behind the ``redo`` operation. Each online subscriber for
-        # the ``message``'s publisher is targeted.
+         __forward: (message, subscriber) ->
+            subscriber.forwards.apply subscriber.context, message.copy()
+
+        # Broadcasts a message to all subscribers of the messages' publisher.
+        _backwardAll: (message, tip) ->
+            subscribers = message.publisher.subscribers
+            len = subscribers.length
+            while len--
+                @_backwardOne message, subscribers[len], tip
+            return
+
+        # Given a message and subscriber, backward the message from the subscriber
+        # only if the subscriber is online and does not preceed the ``tip``
+        # message. What ``tip`` denotes varies on the context of the
+        # backwarding.
+        #
+        # This hub is locked for the during of this call stack (relative to
+        # the handler) to prevent dependent messages from being recorded in
+        # the messages.
         #
         # Errors must be caught here to ensure other subscribers are not
         # affected downstream.
-        _forwards: (message) ->
+        _backwardOne: (message, subscriber) ->
+            return if not subscriber.online
+            if not @locked
+                @locked = true
+                @direction = 'backward'
+                try
+                    @__backward subscriber, message
+                    subscriber.tip = message
+                finally
+                    @locked = false
+                    @direction = null
+            else
+                @__backward subscriber, message
+            return
 
-            publisher = message.publisher
-            if publisher.subscribers.length
-                for subscriber in publisher.subscribers
-                    if not subscriber.online then continue
-                    try
-                        subscriber.forwards.apply subscriber.context, message.copy()
-                    finally
-                        subscriber.tip = message
-
-            @tip = message
-
-        # The logic behind the ``undo`` operation. Each online subscriber for
-        # the ``message``'s publisher is targeted. If the ``backwards`` handler is not
-        # defined, the ``forwards`` handler will be used with the previous
-        # message's ``content`` for the publisher to mimic the last state.
-        #
-        # Errors must be caught here to ensure other subscribers are not
-        # affected downstream.
-        _backwards: (message) ->
-
-            publisher = message.publisher
-            if publisher.subscribers.length
-                for subscriber in publisher.subscribers
-                    if not subscriber.online then continue
-
-                    try
-                        if not subscriber.backwards
-                            if message.previous
-                                subscriber.forwards.apply subscriber.context, message.previous.copy()
-                            else
-                                subscriber.forwards.apply subscriber.context
-                        else
-                            subscriber.backwards.apply subscriber.context, message.copy()
-                    finally
-                        subscriber.tip = message
-
-            @tip = message
+        # If a ``backwards`` handler exists for this subscriber, use the
+        # message that has been passed in as is. Otherwise fallback to
+        # the ``forwards`` handler. If the message passed in is not
+        # temporary (i.e. has been recorded), use the previous message (to
+        # mimic the previous state), otherwise use the message passed in.
+        __backward: (subscriber, message) ->
+            if subscriber.backwards
+                subscriber.backwards.apply subscriber.context, message.copy()
+            else
+                if message.temp
+                    copy = message.copy()
+                else if message.previous
+                    copy = message.previous.copy()
+                else
+                    copy = []
+                subscriber.forwards.apply subscriber.context, copy
 
         # Takes each message in the ``redos`` and removes and  deferences them
         # from the respective ``publisher`` and the hub.
@@ -300,18 +324,21 @@ do (window) ->
         # This includes _flushed_ messages from the ``redos`` stack as well as
         # ``undos`` that have been shifted off the beginning of the stack.
         _purge: (message) ->
-            message.publisher.purge message
+            message.publisher._purge message
             delete @messages[message.id]
 
         # Create a new ``message``, store a reference to the last message relative
         # to the publisher. This is for idempotent (or those without a
         # ``backwards`` handler) subscribers.
-        _record: (publisher, args) ->
+        _record: (publisher, content) ->
             @_flush()
-            message = new Message publisher, args
+            message = new Message publisher, content
+            @messages[message.id] = @
             @_prune()
             @undos.push message
-            @tip = message
-            message
+            return message
+
+        _temp: (publisher, content) ->
+            new Message publisher, content, true
 
     window.PubSub = PubSub

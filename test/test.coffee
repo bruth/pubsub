@@ -1,30 +1,46 @@
-test 'Publish', 3, ->
+test 'Publisher', 7, ->
+    hub = new PubSub
+
+    hub.publish 'foo', 1
+    hub.publish 'foo', 2
+    p = hub.publish 'foo', 3
+    equals p.messages.length, 3
+    equals p.tip().content[0], 3
+
+    p.active = false
+    ok not hub.publish 'foo', 'nope'
+    equals p.messages.length, 3, 'not recorded'
+    p.active = true
+    ok hub.publish 'foo', 'yep'
+
+    p = hub.publish 'bar', 1, 2, 3, 4
+    equals p.messages.length, 1
+
+    p = hub.publish 'baz', ->
+    equals p.messages.length, 1
+
+
+test 'Subscriber', 6, ->
     hub = new PubSub
     output = null
 
-    hub.subscribe 'foo', (msg) ->
-        output = msg
-
-    hub.publish 'foo', 'hello moto'
-    equals output, 'hello moto', 'updated'
-
-    hub.publish 'bar', 'something new'
-    equals output, 'hello moto', 'nothing changed due to a new topic'
-
-    hub.publish 'foo', 'and again'
-    equals output, 'and again', 'updated'
-
-
-test 'Subscribe', 3, ->
-    hub = new PubSub
-    output = null
-
-    sub = hub.subscribe 'foo', (msg) ->
-        output = msg
+    # basic usage
+    s1 = hub.subscribe 'foo', (msg) -> output = msg
+    # custom context
+    hub.subscribe 'foo', ((msg) -> output = "#{@} #{msg}"), null, 'goober'
+    s2 = hub.subscribe 'foo', (msg) -> output = "moto #{msg}"
 
     ok hub.publishers.foo, 'a new topic has been added'
-    ok hub.subscribers[sub.id], 'the subscriber has been added'
+    equals s1.publisher.subscribers.length, 3, 'the subscriber has been added'
     equals output, null, 'nothing changed yet'
+
+    # offline
+    s2.online = false
+
+    hub.publish 'foo', 4
+    ok s1.tip
+    ok not s2.tip
+    equals output, 'goober 4'
 
 
 test 'Subscribe - late', 6, ->
@@ -39,14 +55,14 @@ test 'Subscribe - late', 6, ->
         output++
 
     equals output, 3, 'all history up to this point'
-    equals sub1.tip.id, p3, 'last pub is referenced'
+    equals sub1.tip, p3.tip(), 'last pub is referenced'
 
     sub2 = hub.subscribe 'foo', ->
         output++
     , null, null, 'tip'
 
     equals output, 4, 'only the tip of the history was executed'
-    equals sub2.tip.id, p3, 'last pub is referenced'
+    equals sub2.tip, p3.tip(), 'last pub is referenced'
 
     sub3 = hub.subscribe 'foo', ->
         output++
@@ -169,7 +185,7 @@ test 'Undo/Redo', 12, ->
     equals counter.count, 3, 'cannot go forward'
 
 
-test 'Partial Redo, New Pubs', 11, ->
+test 'Partial Redo, New Pubs', 12, ->
     hub = new PubSub
     output = undefined
 
@@ -195,6 +211,7 @@ test 'Partial Redo, New Pubs', 11, ->
 
     hub.publish 'foo', 'new path'
     equals output, 'new path', 'updated'
+    equals hub.redos.length, 0, 'redos flushed'
 
     hub.redo()
     equals output, 'new path', 'stays the same'
@@ -211,7 +228,7 @@ test 'Partial Redo, New Pubs', 11, ->
     equals output, 'new path', 'cannot go forward'
 
 
-test 'Non-Idempotent Partial Redo, New Pubs', 11, ->
+test 'Non-Idempotent Partial Redo, New Pubs', 12, ->
     hub = new PubSub
     Counter = ->
         @count = 0
@@ -243,6 +260,7 @@ test 'Non-Idempotent Partial Redo, New Pubs', 11, ->
     equals counter.count, 1, '-1'
 
     hub.publish 'foo'
+    equals hub.redos.length, 0, 'redos flushed'
     hub.publish 'foo'
     equals counter.count, 3, '+2'
 
@@ -256,3 +274,64 @@ test 'Non-Idempotent Partial Redo, New Pubs', 11, ->
     hub.redo()
     hub.redo()
     equals counter.count, 3, 'back to tip'
+
+
+test 'Nested Publish Calls', ->
+    hub = new PubSub
+
+    Counter = ->
+        @count = 0
+        @incr = => ++@count
+        @decr = => --@count
+        @
+
+    c1 = new Counter
+    c2 = new Counter
+
+    hub.subscribe 'foo'
+        , ->
+            hub.publish 'bar', c1.incr()
+        , ->
+            hub.publish 'bar', c1.decr()
+
+    hub.subscribe 'bar'
+        , ->
+            c2.incr() if c2.count < 3
+        , ->
+            c2.decr() if c2.count > 0
+
+
+    hub.publish 'foo'
+    equals c1.count, 1
+    equals c2.count, 1
+
+    hub.undo()
+    equals c1.count, 0
+    equals c2.count, 0
+
+    hub.redo()
+    equals c1.count, 1
+    equals c2.count, 1
+
+    hub.publish 'foo'
+    hub.publish 'foo'
+    hub.publish 'foo'
+
+    equals c1.count, 4
+    equals c2.count, 3
+
+    hub.undo()
+    hub.undo()
+
+    equals c1.count, 2
+    equals c2.count, 1
+
+    out = 0
+    hub.subscribe 'bar', (count) -> out = Math.pow 2, count
+
+    equals out, 0
+    hub.redo()
+    equals out, 8
+
+    hub.undo()
+    equals out, 4
