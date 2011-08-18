@@ -58,7 +58,7 @@ var __slice = Array.prototype.slice;
     return Publisher;
   })();
   PubSub = (function() {
-    PubSub.prototype.version = '0.3-undoless';
+    PubSub.prototype.version = '0.3';
     function PubSub() {
       this.publishers = {};
       this.subscribers = {};
