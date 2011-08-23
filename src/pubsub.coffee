@@ -9,6 +9,7 @@ do (window) ->
 
     # Internal unique identifiers for messages and subscribers global to the
     # PubSub constructor. This ensures cross hub references never clash.
+    huid = 1
     suid = 1
     muid = 1
 
@@ -70,7 +71,8 @@ do (window) ->
     class PubSub
         version: '@VERSION'
 
-        constructor: ->
+        constructor: (@debug=false) ->
+            @id = huid++
             @publishers = {}
             @subscribers = {}
             @messages = {}
@@ -79,12 +81,14 @@ do (window) ->
             if not (publisher = @publishers[topic])
                 publisher = new Publisher topic
                 @publishers[topic] = publisher
+                @log "Publisher '#{publisher.topic}' added"
             return publisher
 
         _addSubscriber: (publisher, handler, context) ->
             subscriber = new Subscriber publisher, handler, context
             @subscribers[subscriber.id] = subscriber
             publisher._add subscriber
+            @log "Subscriber ##{subscriber.id} added"
             return subscriber
 
         # Subscribes a handler for the given publisher.
@@ -106,7 +110,8 @@ do (window) ->
                 subscriber = topic
                 subscriber.online = true
                 publisher = subscriber.publisher
-                migrate = handler or migrate 
+                migrate = handler or migrate
+                @log "Subscriber ##{subscriber.id} online"
             else
                 # Handle the shorthand notation, only handling topic, subscriber
                 # and migrate.
@@ -128,13 +133,16 @@ do (window) ->
             if complete
                 delete @subscribers[subscriber.id]
                 subscriber.publisher._remove subscriber
+                @log "Subscriber ##{subscriber.id} removed"
             else
                 subscriber.online = false
+                @log "Subscriber ##{subscriber.id} offline"
 
         # Publishes content for the specified ``topic``. 
         publish: (topic, content...) ->
             publisher = @_addPublisher topic
             return if not publisher.active
+            @log "'#{publisher.topic}' published ->", content
             message = @_record publisher, content
             @_applyToAll message
             return publisher
@@ -175,6 +183,7 @@ do (window) ->
         # affected downstream.
         _applyToOne: (message, subscriber) ->
             return if not subscriber.online
+            @log "Subscriber ##{subscriber.id} <-", message.content
             subscriber.handler.apply subscriber.context, message.copy()
             subscriber.tip = message
 
@@ -184,5 +193,17 @@ do (window) ->
             message = new Message publisher, content
             @messages[message.id] = @
             return message
+
+    if console?.log
+        PubSub::log = (msg, args...) ->
+            if @debug
+                msg = "Hub ##{@id}: #{msg}"
+                if args.length
+                    console.log msg, args...
+                else
+                    console.log msg
+    else
+        PubSub::log = ->
+
 
     window.PubSub = PubSub
