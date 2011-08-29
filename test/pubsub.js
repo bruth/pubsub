@@ -59,7 +59,7 @@ var __slice = Array.prototype.slice;
     return Publisher;
   })();
   PubSub = (function() {
-    PubSub.prototype.version = '0.3-undoless';
+    PubSub.prototype.version = '0.3';
     function PubSub(debug) {
       this.debug = debug != null ? debug : false;
       this.id = huid++;
