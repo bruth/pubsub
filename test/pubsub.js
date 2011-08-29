@@ -1,7 +1,6 @@
 var __slice = Array.prototype.slice;
 (function(window) {
-  var Message, PubSub, Publisher, Subscriber, huid, muid, suid;
-  huid = 1;
+  var Message, PubSub, Publisher, Subscriber, muid, suid;
   suid = 1;
   muid = 1;
   Subscriber = (function() {
@@ -59,10 +58,8 @@ var __slice = Array.prototype.slice;
     return Publisher;
   })();
   PubSub = (function() {
-    PubSub.prototype.version = '0.3';
-    function PubSub(debug) {
-      this.debug = debug != null ? debug : false;
-      this.id = huid++;
+    PubSub.prototype.version = '0.3-undoless';
+    function PubSub() {
       this.publishers = {};
       this.subscribers = {};
       this.messages = {};
@@ -72,7 +69,6 @@ var __slice = Array.prototype.slice;
       if (!(publisher = this.publishers[topic])) {
         publisher = new Publisher(topic);
         this.publishers[topic] = publisher;
-        this.log("Publisher '" + publisher.topic + "' added");
       }
       return publisher;
     };
@@ -81,7 +77,6 @@ var __slice = Array.prototype.slice;
       subscriber = new Subscriber(publisher, handler, context);
       this.subscribers[subscriber.id] = subscriber;
       publisher._add(subscriber);
-      this.log("Subscriber #" + subscriber.id + " added");
       return subscriber;
     };
     PubSub.prototype.subscribe = function(topic, handler, context, migrate) {
@@ -94,7 +89,6 @@ var __slice = Array.prototype.slice;
         subscriber.online = true;
         publisher = subscriber.publisher;
         migrate = handler || migrate;
-        this.log("Subscriber #" + subscriber.id + " online");
       } else {
         if (context === true || context === 'tip' || context === false) {
           _ref = [context, migrate], migrate = _ref[0], context = _ref[1];
@@ -118,11 +112,9 @@ var __slice = Array.prototype.slice;
       }
       if (complete) {
         delete this.subscribers[subscriber.id];
-        subscriber.publisher._remove(subscriber);
-        return this.log("Subscriber #" + subscriber.id + " removed");
+        return subscriber.publisher._remove(subscriber);
       } else {
-        subscriber.online = false;
-        return this.log("Subscriber #" + subscriber.id + " offline");
+        return subscriber.online = false;
       }
     };
     PubSub.prototype.publish = function() {
@@ -132,7 +124,6 @@ var __slice = Array.prototype.slice;
       if (!publisher.active) {
         return;
       }
-      this.log("'" + publisher.topic + "' published ->", content);
       message = this._record(publisher, content);
       this._applyToAll(message);
       return publisher;
@@ -173,7 +164,6 @@ var __slice = Array.prototype.slice;
       if (!subscriber.online) {
         return;
       }
-      this.log("Subscriber #" + subscriber.id + " <-", message.content);
       subscriber.handler.apply(subscriber.context, message.copy());
       return subscriber.tip = message;
     };
@@ -185,21 +175,5 @@ var __slice = Array.prototype.slice;
     };
     return PubSub;
   })();
-  if (typeof console !== "undefined" && console !== null ? console.log : void 0) {
-    PubSub.prototype.log = function() {
-      var args, msg;
-      msg = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      if (this.debug) {
-        msg = "Hub #" + this.id + ": " + msg;
-        if (args.length) {
-          return console.log.apply(console, [msg].concat(__slice.call(args)));
-        } else {
-          return console.log(msg);
-        }
-      }
-    };
-  } else {
-    PubSub.prototype.log = function() {};
-  }
   return window.PubSub = PubSub;
 })(window);
