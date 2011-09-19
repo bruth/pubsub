@@ -1,7 +1,7 @@
 <!DOCTYPE html>  <html> <head>   <title>pubsub.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <link rel="stylesheet" media="all" href="docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>          <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               pubsub.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>               <pre><code>PubSub - The PubSub library with a history API
 (c) 2011 Byron Ruth
 PubSub may be freely distributed under the MIT license
-Version: 0.3
+Version: 0.3-undo
 </code></pre>             </td>             <td class="code">               <div class="highlight"><pre><span class="nx">do</span> <span class="nf">(window) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Internal unique identifiers for messages and subscribers global to the
 PubSub constructor. This ensures cross hub references never clash.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">suid = </span><span class="mi">1</span>
     <span class="nv">muid = </span><span class="mi">1</span></pre></div>             </td>           </tr>                               <tr id="section-3">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-3">&#182;</a>               </div>               <h2>Subscriber</h2>
@@ -58,7 +58,7 @@ broadcasted to it's subscribers.</p>             </td>             <td class="co
 <code>undoStackSize</code> which specifies a limit to the undo stack size. If
 it reaches the limit, the oldest undo will be shifted off the bottom
 of the stack.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="k">class</span> <span class="nx">PubSub</span>
-        <span class="nv">version: </span><span class="s1">&#39;0.3&#39;</span>
+        <span class="nv">version: </span><span class="s1">&#39;0.3-undo&#39;</span>
 
         <span class="nv">constructor: </span><span class="nf">(@undoStackSize) -&gt;</span>
             <span class="vi">@publishers = </span><span class="p">{}</span>

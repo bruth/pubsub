@@ -78,7 +78,7 @@ var __slice = Array.prototype.slice;
     return Publisher;
   })();
   PubSub = (function() {
-    PubSub.prototype.version = '0.3';
+    PubSub.prototype.version = '0.3-undo';
     function PubSub(undoStackSize) {
       this.undoStackSize = undoStackSize;
       this.publishers = {};
