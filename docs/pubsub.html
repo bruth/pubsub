@@ -2,7 +2,7 @@
 (c) 2011 Byron Ruth
 PubSub may be freely distributed under the MIT license
 Version: 0.3
-</code></pre>             </td>             <td class="code">               <div class="highlight"><pre><span class="nx">do</span> <span class="nf">(window) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Internal unique identifiers for messages and subscribers global to the
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre><span class="nx">define</span> <span class="o">-&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <p>Internal unique identifiers for messages and subscribers global to the
 PubSub constructor. This ensures cross hub references never clash.</p>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">suid = </span><span class="mi">1</span>
     <span class="nv">muid = </span><span class="mi">1</span></pre></div>             </td>           </tr>                               <tr id="section-3">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-3">&#182;</a>               </div>               <h2>Subscriber</h2>
 
@@ -259,6 +259,6 @@ to the publisher. This is for idempotent (or those without a
         <span class="nv">_temp: </span><span class="nf">(publisher, content) -&gt;</span>
             <span class="k">new</span> <span class="nx">Message</span> <span class="nx">publisher</span><span class="p">,</span> <span class="nx">content</span><span class="p">,</span> <span class="kc">true</span>
 
-    <span class="nb">window</span><span class="p">.</span><span class="nv">PubSub = </span><span class="nx">PubSub</span>
+    <span class="k">return</span> <span class="nx">PubSub</span>
 
 </pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 

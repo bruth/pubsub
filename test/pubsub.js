@@ -1,5 +1,5 @@
 var __slice = Array.prototype.slice;
-(function(window) {
+define(function() {
   var Message, PubSub, Publisher, Subscriber, muid, suid;
   suid = 1;
   muid = 1;
@@ -330,5 +330,5 @@ var __slice = Array.prototype.slice;
     };
     return PubSub;
   })();
-  return window.PubSub = PubSub;
-})(window);
+  return PubSub;
+});

@@ -5,7 +5,7 @@
 #     Version: @VERSION
 #
 
-do (window) ->
+define ->
 
     # Internal unique identifiers for messages and subscribers global to the
     # PubSub constructor. This ensures cross hub references never clash.
@@ -345,4 +345,4 @@ do (window) ->
         _temp: (publisher, content) ->
             new Message publisher, content, true
 
-    window.PubSub = PubSub
+    return PubSub
